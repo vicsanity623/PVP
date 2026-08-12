@@ -893,14 +893,15 @@ document.getElementById('spendDustBtn').onclick = async () => {
   if(!profile || profile.dust <= 0){ toast('No dust to spend'); return; }
   const max = profile.dust;
   const res = await showDialog('Spend Dust on XP',
-    `<div class="dlg-body"><p class="muted">Convert dust to XP at a 1:1 rate. You have <b>${max}✨</b>.</p>
-     <div class="quick-amounts">
-       <button class="btn secondary" onclick="setDlgInput(10)">10</button>
-       <button class="btn secondary" onclick="setDlgInput(50)">50</button>
-       <button class="btn secondary" onclick="setDlgInput(100)">100</button>
-       <button class="btn secondary" onclick="setDlgInput(${max})">All</button>
-     </div>
-     <label>Amount</label><input type="text" id="dlgInput" inputmode="numeric" value="${Math.min(100,max)}" style="margin-top:6px;"></div>`,
+    `<div class="dlg-body">
+       <p class="muted">Convert dust to XP at a 1:1 rate. You have <b>${max}✨</b>.</p>
+       <div class="quick-amounts">
+         <button class="btn secondary" onclick="setDlgInput(10)">10</button>
+         <button class="btn secondary" onclick="setDlgInput(50)">50</button>
+         <button class="btn secondary" onclick="setDlgInput(100)">100</button>
+         <button class="btn secondary" onclick="setDlgInput(${max})">All</button>
+       </div>
+       <label>Amount</label><input type="text" id="dlgInput" inputmode="numeric" value="${Math.min(100,max)}" style="margin-top:6px;"></div>`,
     { confirmText: 'Convert' });
   if(!res.ok) return;
   const amount = parseInt(res.value, 10);
