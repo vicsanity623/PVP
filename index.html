@@ -717,18 +717,16 @@ function showDialog(title, bodyHTML, opts = {}){
   document.getElementById('dialogBg').classList.add('show');
   return new Promise(res => { dlgState.resolve = res; });
 }
-function closeDialog(){
+function closeDialog(result = { ok: false, value: null }){
   document.getElementById('dialogBg').classList.remove('show');
   const r = dlgState.resolve;
   dlgState.resolve = null;
-  if(r) r({ ok:false, value:null });
+  if(r) r(result);
 }
 document.getElementById('dlgConfirm').onclick = () => {
-  const r = dlgState.resolve;
   const inp = document.getElementById('dlgInput');
   const value = inp ? inp.value.trim() : dlgState.value || null;
-  closeDialog();
-  if(r) r({ ok:true, value });
+  closeDialog({ ok: true, value });
 };
 document.getElementById('dlgCancel').onclick = closeDialog;
 document.getElementById('dlgClose').onclick = closeDialog;
@@ -1247,9 +1245,7 @@ async function learnMove(moveId){
   }catch(e){ toast(e.message); }
 }
 function pickMoveToReplace(id){
-  dlgState.value = id;
-  document.getElementById('dlgCancel').closest('.dlg-btns').querySelector('#dlgConfirm').style.display = 'none';
-  closeDialog();
+  closeDialog({ ok: true, value: id });
 }
 
 /* ---------------- Battle ---------------- */
