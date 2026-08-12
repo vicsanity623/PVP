@@ -166,22 +166,31 @@
 
 <div id="toast"></div>
 
-<!-- FIRST-RUN SETUP: server URL + username -->
+<!-- FIRST-RUN SETUP: just pick a name -->
 <div id="setupScreen">
   <div class="card" id="setupCard">
     <h2>Welcome to GiftQuest</h2>
-    <p class="muted" style="margin-top:-6px;">Connect to your GiftQuest server (the Tailscale URL you host the backend on, e.g. <code>http://100.x.x.x:8989</code>) and pick a name.</p>
-    <div style="margin-bottom:10px;">
-      <label class="muted" style="font-size:12px;">Server URL</label>
-      <input type="text" id="setupServerUrl" placeholder="http://100.x.x.x:8989">
-    </div>
+    <p class="muted" style="margin-top:-6px;">Pick a name to enter. The game auto-connects to its server — no URL needed.</p>
     <div style="margin-bottom:16px;">
       <label class="muted" style="font-size:12px;">Your name</label>
       <input type="text" id="setupUsername" placeholder="Trainer name">
     </div>
     <button class="btn block" id="setupSubmit">Enter GiftQuest</button>
-    <p class="muted" style="font-size:11.5px; margin-top:10px;">Already have a player? This creates a NEW player on that server. To resume an existing player on another device, use "Restore player ID" below.</p>
+    <p class="muted" style="font-size:11.5px; margin-top:10px;">Already have a player? This creates a NEW player. To resume an existing player on another device, use "Restore player ID" below.</p>
     <button class="btn secondary block" id="setupRestore" style="margin-top:8px;">Restore player ID instead</button>
+    <details style="margin-top:14px;">
+      <summary class="muted" style="cursor:pointer; font-size:12px;">Server start / stop commands</summary>
+      <pre style="margin:8px 0 0; padding:10px; border-radius:10px; background:var(--bg-deep); border:1px solid #4a3a80; color:var(--text); font-size:11px; line-height:1.55; overflow-x:auto;"># start backend (background)
+cd giftquest/backend
+nohup venv/bin/python app.py > giftquest.log 2>&1 &
+
+# stop backend
+kill $(lsof -t -iTCP:8989 -sTCP:LISTEN)
+
+# public funnel  https://vics-imac-1.tail37b4f2.ts.net:8443
+tailscale funnel --bg --yes --https=8443 http://127.0.0.1:8989   # start
+tailscale funnel --https=8443 off                                # stop</pre>
+    </details>
   </div>
 </div>
 
@@ -365,8 +374,9 @@
 
 const STORAGE_KEY_SERVER = 'gq_server_url';
 const STORAGE_KEY_PLAYER = 'gq_player_id';
+const DEFAULT_SERVER_URL = 'https://vics-imac-1.tail37b4f2.ts.net:8443';
 
-let SERVER_URL = localStorage.getItem(STORAGE_KEY_SERVER) || '';
+let SERVER_URL = localStorage.getItem(STORAGE_KEY_SERVER) || DEFAULT_SERVER_URL;
 let PLAYER_ID = localStorage.getItem(STORAGE_KEY_PLAYER) || '';
 let profile = null;
 let friendsCache = [];
@@ -409,10 +419,8 @@ async function api(path, method='GET', body=null){
 
 /* ---------------- Setup / boot ---------------- */
 document.getElementById('setupSubmit').onclick = async () => {
-  const url = document.getElementById('setupServerUrl').value.trim();
   const name = document.getElementById('setupUsername').value.trim() || 'Trainer';
-  if(!url){ toast('Enter your server URL'); return; }
-  SERVER_URL = url;
+  SERVER_URL = DEFAULT_SERVER_URL;
   try{
     const p = await api('/api/register', 'POST', { username: name });
     PLAYER_ID = p.id;
@@ -423,11 +431,10 @@ document.getElementById('setupSubmit').onclick = async () => {
 };
 
 document.getElementById('setupRestore').onclick = async () => {
-  const url = prompt('Server URL:', SERVER_URL || 'http://100.x.x.x:8989');
-  if(!url) return;
+  SERVER_URL = DEFAULT_SERVER_URL;
   const pid = prompt('Your existing Player ID (find it in a previous export / your other device\'s localStorage):');
   if(!pid) return;
-  SERVER_URL = url; PLAYER_ID = pid.trim();
+  PLAYER_ID = pid.trim();
   try{
     await api('/api/profile/' + PLAYER_ID);
     localStorage.setItem(STORAGE_KEY_SERVER, SERVER_URL);
@@ -448,7 +455,7 @@ function boot(){
   setInterval(refreshProfile, 20000);
 }
 
-if(SERVER_URL && PLAYER_ID){ boot(); }
+if(PLAYER_ID){ boot(); }
 
 /* ---------------- Tabs ---------------- */
 document.querySelectorAll('#tabbar .tab').forEach(btn => {
