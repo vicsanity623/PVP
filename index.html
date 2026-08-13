@@ -254,7 +254,7 @@
 
 <div id="toast"></div>
 
-<!-- FIRST-RUN SETUP: just pick a name -->
+<!-- FIRST-RUN SETUP -->
 <div id="setupScreen">
   <div class="card" id="setupCard">
     <h2>Welcome to GiftQuest</h2>
@@ -491,7 +491,7 @@ tailscale funnel --https=8443 off                                # stop</pre>
   </div>
 </div>
 
-<!-- Generic in-game dialog (replaces alert/confirm/prompt) -->
+<!-- Generic in-game dialog -->
 <div class="modal-bg" id="dialogBg">
   <div class="modal">
     <button class="close-x" id="dlgClose">×</button>
@@ -505,15 +505,6 @@ tailscale funnel --https=8443 off                                # stop</pre>
 </div>
 
 <script>
-/* =========================================================================
-   GiftQuest client — plain JS, no build step, no frameworks.
-   State lives in localStorage (server URL + player id) and refreshes from
-   the backend on demand / on a light poll loop.
-   All avatars are generated inline as SVG — no external asset downloads,
-   so nothing heavy needs preloading. The splash below is the launch/preload
-   screen shown while the first profile fetch completes.
-   ========================================================================= */
-
 const STORAGE_KEY_SERVER = 'gq_server_url';
 const STORAGE_KEY_PLAYER = 'gq_player_id';
 const DEFAULT_SERVER_URL = 'https://vics-imac-1.tail37b4f2.ts.net:8443';
@@ -599,14 +590,16 @@ const AV_SHAPES = {
   }
 };
 
+/* FIX 1: Safely deep-merge all default layer keys into avatar state */
 function normalizeAvatarState(raw){
-  if(raw && raw.head && raw.body) return raw;
+  const base = JSON.parse(JSON.stringify(defaultAvatarState));
+  if (!raw) return base;
   return {
     version: 2,
-    head: { shape: 'circle', color: (raw && raw.skin) || '#f3c19a', x: 0, y: -5, scale: 1, rot: 0 },
-    body: { shape: 'torso', color: (raw && raw.outfitColor) || '#ff6b6b', x: 0, y: 25, scale: 1, rot: 0 },
-    hair: { shape: (raw && raw.hairStyle === 'bald' ? 'none' : 'spiky'), color: (raw && raw.hairColor) || '#1d1d1d', x: 0, y: -22, scale: 1, rot: 0 },
-    acc:  { shape: 'none', color: '#1a1a1a', x: 0, y: -5, scale: 1, rot: 0 }
+    head: Object.assign({}, base.head, raw.head || { color: raw.skin }),
+    body: Object.assign({}, base.body, raw.body || { color: raw.outfitColor }),
+    hair: Object.assign({}, base.hair, raw.hair || { shape: raw.hairStyle === 'bald' ? 'none' : 'spiky', color: raw.hairColor }),
+    acc:  Object.assign({}, base.acc, raw.acc || {})
   };
 }
 
@@ -642,7 +635,7 @@ function renderAvatarSVG(rawState, size){
   return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-label="avatar">${svgParts.join('')}</svg>`;
 }
 
-/* ---------------- In-game dialog (no system alerts) ---------------- */
+/* ---------------- In-game dialog ---------------- */
 let dlgState = { resolve: null };
 function showDialog(title, bodyHTML, opts = {}){
   dlgState = { resolve: null };
@@ -782,7 +775,7 @@ async function refreshProfile(){
   document.getElementById('xpBar').style.width = xpPct + '%';
   document.getElementById('xpLabel').textContent = profile.xp_this_level + ' / ' + (profile.xp_needed_this_level||'MAX') + ' XP';
   document.getElementById('homeAvatarThumb').innerHTML = renderAvatarSVG(profile.avatar, 62);
-  avatarState = Object.assign({}, avatarState, profile.avatar || {});
+  avatarState = normalizeAvatarState(profile.avatar);
   renderAvatarEditor();
 
   const boostsCard = document.getElementById('activeBoostsCard');
@@ -963,7 +956,7 @@ function renderPostcardArea(){
   } else if(selectedPostcardType === 'gif'){
     area.innerHTML = `
       <input type="text" id="gifSearchInput" placeholder="Search GIFs...">
-      <p class="muted" style="font-size:11px; margin-top:6px;">GIF search requires a free Tenor API key — add yours in the code (search for TENOR_API_KEY). Without it, paste a direct GIF URL below instead.</p>
+      <p class="muted" style="font-size:11px; margin-top:6px;">GIF search requires a Tenor API key — add yours in TENOR_API_KEY. Without it, paste a direct GIF URL below.</p>
       <input type="text" id="gifUrlInput" placeholder="...or paste a GIF URL directly" style="margin-top:8px;">
       <div id="gifSearchResults"></div>
     `;
@@ -981,7 +974,7 @@ function renderPostcardArea(){
 }
 renderPostcardArea();
 
-const TENOR_API_KEY = ''; // optional: add a free Tenor API key to enable in-app GIF search
+const TENOR_API_KEY = '';
 async function searchGifs(q){
   try{
     const res = await fetch(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_API_KEY}&limit=9&media_filter=gif`);
@@ -1082,13 +1075,18 @@ async function claimMission(missionId){
 let openingGiftId = null;
 function openGiftModal(giftId, senderName){
   openingGiftId = giftId;
+  document.getElementById('confirmOpenGiftBtn').disabled = false;
   document.getElementById('openGiftTitle').textContent = 'Gift from ' + senderName;
   document.getElementById('openGiftContent').innerHTML = '<p class="muted">Tap below to see what\'s inside!</p>';
   document.getElementById('openGiftModalBg').classList.add('show');
 }
 document.getElementById('closeOpenGiftModal').onclick = () => document.getElementById('openGiftModalBg').classList.remove('show');
+
+/* FIX 3: Disable button and reset openingGiftId upon opening gift */
 document.getElementById('confirmOpenGiftBtn').onclick = async () => {
   if(!openingGiftId) return;
+  const btn = document.getElementById('confirmOpenGiftBtn');
+  btn.disabled = true;
   try{
     const r = await api('/api/gift/open', 'POST', { player_id: PLAYER_ID, gift_id: openingGiftId });
     let msg = '';
@@ -1097,8 +1095,12 @@ document.getElementById('confirmOpenGiftBtn').onclick = async () => {
     else if(r.reward.type==='boost') msg = `You found a boost: ${r.reward.boost.name}!`;
     else msg = 'Just a nice postcard this time.';
     document.getElementById('openGiftContent').innerHTML = `<p style="font-size:16px; text-align:center; padding:12px 0;">🎉 ${msg}</p>`;
+    openingGiftId = null;
     profile = r.profile; refreshProfile(); refreshGifts(); refreshFriends();
-  }catch(e){ toast(e.message); }
+  }catch(e){ 
+    toast(e.message);
+    btn.disabled = false;
+  }
 };
 
 /* ---------------- COD Emblem Studio Editor Logic ---------------- */
@@ -1109,7 +1111,6 @@ function renderAvatarEditor(){
     prevWrap.outerHTML = renderAvatarSVG(avatarState, 180).replace('<svg', '<svg id="avatarPreview" style="width:100%;height:100%;"').replace('width="180" height="180"', '');
   }
 
-  // Update tabs
   document.querySelectorAll('#avatarSectionTabs button').forEach(b => {
     b.classList.toggle('active', b.dataset.sec === activeAvatarSec);
     b.onclick = () => { activeAvatarSec = b.dataset.sec; renderAvatarEditor(); };
@@ -1163,12 +1164,10 @@ function renderAvatarEditor(){
     </div>
   `;
 
-  // Bind shape pickers
   box.querySelectorAll('.shape-btn').forEach(b => {
     b.onclick = () => { avatarState[sec].shape = b.dataset.s; renderAvatarEditor(); };
   });
 
-  // Bind swatches & color picker
   box.querySelectorAll('.swatch').forEach(s => {
     s.onclick = () => { avatarState[sec].color = s.dataset.c; renderAvatarEditor(); };
   });
@@ -1177,7 +1176,6 @@ function renderAvatarEditor(){
     cp.oninput = (e) => { avatarState[sec].color = e.target.value; renderAvatarEditor(); };
   }
 
-  // Bind transform sliders
   const slX = box.querySelector('#slX'), valX = box.querySelector('#valX');
   const slY = box.querySelector('#slY'), valY = box.querySelector('#valY');
   const slScale = box.querySelector('#slScale'), valScale = box.querySelector('#valScale');
@@ -1409,11 +1407,12 @@ function renderBattleState(s){
   const friend = friendsCache.find(f=>f.id === s.opponent.player_id);
   oppRec.textContent = friend ? (friend.pvp_wins+'-'+friend.pvp_losses+' PvP') : '';
 
+  /* FIX 2: Only mark dataset.built = '1' if window.ALL_MOVES is loaded */
   const specialSel = document.getElementById('specialMoveSelect');
-  if(profile && specialSel.dataset.built !== '1'){
+  if(profile && specialSel.dataset.built !== '1' && window.ALL_MOVES){
     const known = (profile.moves||[]).filter(m=>m!=='slap_face_hard');
     specialSel.innerHTML = known.length
-      ? known.map(id => { const m = (window.ALL_MOVES||[]).find(x=>x.id===id); return m ? `<option value="${id}">${m.name} (${m.be_cost} BE)</option>` : ''; }).join('')
+      ? known.map(id => { const m = window.ALL_MOVES.find(x=>x.id===id); return m ? `<option value="${id}">${m.name} (${m.be_cost} BE)</option>` : ''; }).join('')
       : '<option value="slap_face_hard">Slap Face Hard (fallback)</option>';
     specialSel.dataset.built = '1';
   }
