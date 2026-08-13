@@ -1374,7 +1374,11 @@ async function updateBattleState(){
   if(s.status === 'finished'){
     clearInterval(battlePollTimer);
     let msg;
-    if(s.winner_id === s.you.player_id) msg = '🏆 Victory!';
+    if(s.winner_id === s.you.player_id){
+      msg = '🏆 Victory!';
+      if(s.reward && s.reward.dust) msg += ' +' + s.reward.dust + ' dust';
+      if(s.reward && s.reward.xp) msg += ' +' + s.reward.xp + ' XP';
+    }
     else if(!s.winner_id) msg = 'Draw!';
     else msg = 'Defeat — good fight!';
     setTimeout(()=>toast(msg), 400);
