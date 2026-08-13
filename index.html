@@ -553,6 +553,128 @@ tailscale funnel --https=8443 off                                # stop</pre>
   </div>
 </div>
 
+<script>
+  // GiftQuest Frontend Data Flow & Polling Optimizer
+  (function() {
+    // 1. Request Deduplication & Exponential Backoff Retry for Fetch
+    const activeGetRequests = new Map();
+    const originalFetch = window.fetch;
+
+    window.fetch = function(input, init) {
+      const url = typeof input === 'string' ? input : (input && input.url);
+      const method = (init && init.method || 'GET').toUpperCase();
+
+      // Only deduplicate GET requests to avoid interfering with mutations
+      if (method === 'GET' && url) {
+        if (activeGetRequests.has(url)) {
+          return activeGetRequests.get(url).then(response => response.clone());
+        }
+        const promise = fetchWithRetry(input, init, 3, 1000)
+          .then(response => {
+            activeGetRequests.delete(url);
+            return response;
+          })
+          .catch(error => {
+            activeGetRequests.delete(url);
+            throw error;
+          });
+        activeGetRequests.set(url, promise);
+        return promise.then(response => response.clone());
+      }
+
+      return fetchWithRetry(input, init, 1, 1000);
+    };
+
+    function fetchWithRetry(input, init, retries, delay) {
+      return originalFetch(input, init).catch(error => {
+        const method = (init && init.method || 'GET').toUpperCase();
+        // Only retry GET requests to prevent duplicate POST mutations
+        if (retries > 1 && method === 'GET') {
+          return new Promise(resolve => setTimeout(resolve, delay))
+            .then(() => fetchWithRetry(input, init, retries - 1, delay * 2));
+        }
+        throw error;
+      });
+    }
+
+    // 2. Page Visibility Polling Optimizer (Pause/Resume intervals)
+    const activeIntervals = new Map();
+    const originalSetInterval = window.setInterval;
+    const originalClearInterval = window.clearInterval;
+
+    window.setInterval = function(handler, timeout, ...args) {
+      const id = originalSetInterval(handler, timeout, ...args);
+      activeIntervals.set(id, { handler, timeout, args, currentId: id });
+      return id;
+    };
+
+    window.clearInterval = function(id) {
+      const item = activeIntervals.get(id);
+      if (item) {
+        originalClearInterval(item.currentId);
+        activeIntervals.delete(id);
+      } else {
+        originalClearInterval(id);
+      }
+    };
+
+    let isPageVisible = true;
+    document.addEventListener('visibilitychange', () => {
+      const visible = document.visibilityState === 'visible';
+      if (visible === isPageVisible) return;
+      isPageVisible = visible;
+
+      if (!visible) {
+        // Pause all active intervals to save battery and server resources
+        for (const item of activeIntervals.values()) {
+          originalClearInterval(item.currentId);
+        }
+      } else {
+        // Resume all intervals and trigger immediate execution for instant UI updates
+        for (const item of activeIntervals.values()) {
+          try {
+            if (typeof item.handler === 'function') {
+              item.handler(...item.args);
+            } else if (typeof item.handler === 'string') {
+              new Function(item.handler)();
+            }
+          } catch (e) {
+            console.error('Error running resumed interval handler:', e);
+          }
+          item.currentId = originalSetInterval(item.handler, item.timeout, ...item.args);
+        }
+      }
+    });
+
+    // 3. Global Connection Status & Error Boundary Toasts
+    window.addEventListener('offline', () => {
+      if (typeof toast === 'function') {
+        toast('⚠️ You are offline. Some features may be unavailable.', 'error');
+      }
+    });
+
+    window.addEventListener('online', () => {
+      if (typeof toast === 'function') {
+        toast('📶 Back online! Syncing data...', 'success');
+        if (typeof refreshProfile === 'function') refreshProfile();
+      }
+    });
+
+    window.addEventListener('unhandledrejection', event => {
+      // Ignore expected/aborted network errors to avoid spamming the user
+      if (event.reason && event.reason.message && (
+        event.reason.message.includes('Failed to fetch') || 
+        event.reason.message.includes('Load failed')
+      )) {
+        return;
+      }
+      console.error('Unhandled promise rejection:', event.reason);
+      if (typeof toast === 'function') {
+        toast('⚠️ Connection error. Retrying in the background...', 'info');
+      }
+    });
+  })();
+</script>
 <script src="game.js"></script>
 <script>
   // Section 22: Frontend data flow & polling enhancement
