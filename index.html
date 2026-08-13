@@ -554,5 +554,44 @@ tailscale funnel --https=8443 off                                # stop</pre>
 </div>
 
 <script src="game.js"></script>
+<script>
+  // Section 22: Frontend data flow & polling enhancement
+  // Wraps the global api helper with request deduplication and automatic retries with exponential backoff for transient network errors.
+  (function() {
+    const originalApi = window.api;
+    if (typeof originalApi === 'function') {
+      const pendingRequests = new Map();
+      window.api = async function(path, method = 'GET', body = null) {
+        const key = `${method}:${path}:${body ? JSON.stringify(body) : ''}`;
+        if (method === 'GET' && pendingRequests.has(key)) {
+          return pendingRequests.get(key);
+        }
+        const executeRequest = async (retriesLeft = 3, delay = 1000) => {
+          try {
+            return await originalApi(path, method, body);
+          } catch (err) {
+            const errStr = String(err.message || err).toLowerCase();
+            const isTransient = errStr.includes('network') || errStr.includes('failed to fetch') || errStr.includes('timeout') || errStr.includes('load failed');
+            if (isTransient && retriesLeft > 0) {
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return executeRequest(retriesLeft - 1, delay * 1.5);
+            }
+            throw err;
+          }
+        };
+        const promise = executeRequest();
+        if (method === 'GET') {
+          pendingRequests.set(key, promise);
+          try {
+            return await promise;
+          } finally {
+            pendingRequests.delete(key);
+          }
+        }
+        return promise;
+      };
+    }
+  })();
+</script>
 </body>
 </html>
