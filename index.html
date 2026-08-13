@@ -124,9 +124,16 @@
     border:none; cursor:pointer;
   }
   .swatches{display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 4px;}
-  .swatch{width:36px; height:36px; border-radius:50%; border:2px solid transparent; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.3);}
-  .swatch.selected{border-color:var(--accent); transform:scale(1.12);}
+  .swatch{width:34px; height:34px; border-radius:50%; border:2px solid transparent; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.3);}
+  .swatch.selected{border-color:var(--accent); transform:scale(1.15);}
   .swatch.plain{background:conic-gradient(#ccc, #666, #ccc); display:flex; align-items:center; justify-content:center; font-size:11px; color:#222;}
+  .slider-row{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .slider-row label{width:70px; font-size:12px; color:var(--muted); text-transform:uppercase; font-weight:600;}
+  .slider-row input[type=range]{flex:1; accent-color:var(--accent);}
+  .slider-row .val{width:40px; text-align:right; font-size:12px; color:var(--text); font-weight:700;}
+  .shape-grid{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
+  .shape-btn{padding:8px 12px; border-radius:10px; background:var(--panel-2); border:1px solid transparent; color:var(--text); cursor:pointer; font-size:13px; text-transform:capitalize;}
+  .shape-btn.selected{border-color:var(--accent); color:var(--accent); background:rgba(255,181,69,.12);}
   .opt-btn{
     display:inline-block; padding:8px 14px; border-radius:10px; background:var(--panel-2);
     margin:0 6px 6px 0; font-size:13px; border:1px solid transparent; cursor:pointer;
@@ -363,58 +370,27 @@ tailscale funnel --https=8443 off                                # stop</pre>
     <!-- AVATAR -->
     <section class="screen" id="screen-avatar">
       <div class="card">
-        <h2>Customize Trainer</h2>
+        <h2>Gamer Tag & Emblem Studio</h2>
         <div class="avatar-stage">
           <div class="avatar-stage-ring"><svg id="avatarPreview" viewBox="0 0 100 100"></svg></div>
-          <button class="btn secondary" id="randomizeAvatarBtn">🎲 Randomize</button>
+          <div class="row" style="gap:8px; width:100%; max-width:280px;">
+            <button class="btn secondary" style="flex:1;" id="randomizeAvatarBtn">🎲 Randomize</button>
+            <button class="btn secondary" style="flex:1;" id="resetAvatarBtn">🔄 Reset</button>
+          </div>
         </div>
-        <div class="ed-group">
-          <div class="ed-label">Skin tone</div>
-          <div class="swatches" id="swatchSkin"></div>
+
+        <!-- Section Tabs -->
+        <div class="postcard-tabs" id="avatarSectionTabs" style="margin-bottom:14px;">
+          <button class="active" data-sec="head">🗣️ Head</button>
+          <button data-sec="body">👕 Body</button>
+          <button data-sec="hair">💇 Hair</button>
+          <button data-sec="acc">🕶️ Accs</button>
         </div>
-        <div class="ed-group">
-          <div class="ed-label">Hair style</div>
-          <div id="optHairStyle"></div>
-          <div class="ed-label" style="margin-top:8px;">Hair color</div>
-          <div class="swatches" id="swatchHairColor"></div>
-        </div>
-        <div class="ed-group">
-          <div class="ed-label">Facial hair</div>
-          <div id="optFacialHair"></div>
-        </div>
-        <div class="ed-group">
-          <div class="ed-label">Brows</div>
-          <div id="optBrows"></div>
-          <div class="ed-label" style="margin-top:8px;">Eyes</div>
-          <div id="optEyes"></div>
-          <div class="ed-label" style="margin-top:8px;">Eye color</div>
-          <div class="swatches" id="swatchEyeColor"></div>
-        </div>
-        <div class="ed-group">
-          <div class="ed-label">Nose</div>
-          <div id="optNose"></div>
-          <div class="ed-label" style="margin-top:8px;">Mouth</div>
-          <div id="optMouth"></div>
-          <div class="ed-label" style="margin-top:8px;">Cheeks</div>
-          <div id="optCheeks"></div>
-        </div>
-        <div class="ed-group">
-          <div class="ed-label">Face accessory</div>
-          <div id="optFaceAcc"></div>
-          <div class="ed-label" style="margin-top:8px;">Headgear</div>
-          <div id="optHeadgear"></div>
-        </div>
-        <div class="ed-group">
-          <div class="ed-label">Outfit</div>
-          <div id="optOutfit"></div>
-          <div class="ed-label" style="margin-top:8px;">Outfit color</div>
-          <div class="swatches" id="swatchOutfitColor"></div>
-        </div>
-        <div class="ed-group">
-          <div class="ed-label">Badge color</div>
-          <div class="swatches" id="swatchBg"></div>
-        </div>
-        <button class="btn block" id="saveAvatarBtn">Save Avatar</button>
+
+        <!-- Section Editor Controls -->
+        <div id="avatarSectionControls"></div>
+
+        <button class="btn block" id="saveAvatarBtn" style="margin-top:16px;">Save Avatar</button>
       </div>
     </section>
 
@@ -553,153 +529,99 @@ function hideSplash(){
 }
 setTimeout(hideSplash, 2200);
 
-/* ---------------- Avatar option catalog ---------------- */
-const AV = {
-  skin: ['#f9dcba','#f3c19a','#e7a874','#d18a52','#b06d3a','#8f4f2a','#6e3a1f','#4f2a14'],
-  hairColor: ['#1d1d1d','#4a2f1d','#7c4a26','#a8622f','#d4953a','#e7c46b','#c94f4f','#8a6cff','#4a7a5c','#3fa7a7','#e8e8e8'],
-  hairStyle: ['bald','short','spiky','curly','long','bun','fro','ponytail','bangs','mohawk'],
-  facialHair: ['none','mustache','goatee','stubble','beard'],
-  brows: ['natural','thick','thin','angled','bushy'],
-  eyes: ['round','happy','anime','sleepy','cool'],
-  eyeColor: ['#3d2b1f','#2c3e78','#2f6b3f','#4a5568','#8a5a2b','#6b2f5e','#b0413e'],
-  mouth: ['smile','grin','neutral','open','smirk','frown'],
-  nose: ['small','button','pointy','none'],
-  cheeks: ['none','blush','freckles'],
-  faceAcc: ['none','glasses','shades'],
-  headgear: ['none','cap','beanie','crown','headband','bandana','tophat'],
-  outfit: ['tee','hoodie','jersey','suit','robe','armor','jacket'],
-  outfitColor: ['#ff6b6b','#ffb545','#4be08a','#5c8bff','#8a6cff','#e85a7a','#4a9a6b','#7a8a9a','#f1ecff'],
-  bg: ['none','#3a2c66','#2d2150','#1f4d3a','#1f3a5c','#6b2f5e','#5c3a2f','#2c3e4e','#b3453a'],
-};
-let avatarState = {
-  skin: AV.skin[1], hairColor: AV.hairColor[0], hairStyle: 'short',
-  facialHair: 'none', brows: 'natural', eyes: 'round', eyeColor: AV.eyeColor[0],
-  mouth: 'smile', nose: 'small', cheeks: 'none', faceAcc: 'none',
-  headgear: 'none', outfit: 'tee', outfitColor: AV.outfitColor[0], bg: 'none',
+/* ---------------- COD Emblem / Gamer Tag Style Avatar ---------------- */
+const defaultAvatarState = {
+  version: 2,
+  head: { shape: 'circle', color: '#f3c19a', x: 0, y: -5, scale: 1, rot: 0 },
+  body: { shape: 'torso', color: '#ff6b6b', x: 0, y: 25, scale: 1, rot: 0 },
+  hair: { shape: 'spiky', color: '#1d1d1d', x: 0, y: -22, scale: 1, rot: 0 },
+  acc:  { shape: 'none', color: '#1a1a1a', x: 0, y: -5, scale: 1, rot: 0 }
 };
 
-function shade(hex, factor){
-  if(typeof hex !== 'string' || !/^#[0-9a-f]{6}$/i.test(hex)) return hex;
-  const n = parseInt(hex.slice(1), 16);
-  let r = (n>>16)&255, g = (n>>8)&255, b = n&255;
-  r = Math.min(255, Math.round(r*factor));
-  g = Math.min(255, Math.round(g*factor));
-  b = Math.min(255, Math.round(b*factor));
-  return '#' + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+let avatarState = JSON.parse(JSON.stringify(defaultAvatarState));
+let activeAvatarSec = 'head';
+
+const AV_COLORS = ['#f9dcba','#f3c19a','#e7a874','#d18a52','#b06d3a','#1d1d1d','#4a2f1d','#ff6b6b','#ffb545','#4be08a','#5c8bff','#8a6cff','#e85a7a','#f1ecff'];
+
+const AV_SHAPES = {
+  head: {
+    circle: '<circle cx="0" cy="0" r="22"/>',
+    oval: '<ellipse cx="0" cy="0" rx="20" ry="25"/>',
+    rounded: '<rect x="-20" y="-22" width="40" height="44" rx="12"/>',
+    square: '<rect x="-20" y="-20" width="40" height="40" rx="4"/>',
+    triangle: '<polygon points="0,-24 22,18 -22,18"/>',
+    shield: '<path d="M-20,-20 L20,-20 Q20,10 0,25 Q-20,10 -20,-20 Z"/>'
+  },
+  body: {
+    none: '',
+    torso: '<path d="M-22,10 C-18,-5 18,-5 22,10 L28,45 L-28,45 Z"/>',
+    rect: '<rect x="-22" y="-10" width="44" height="40" rx="6"/>',
+    armor: '<path d="M-24,-8 L24,-8 L18,35 L-18,35 Z"/>',
+    vshape: '<polygon points="-25,-10 25,-10 0,40"/>',
+    roundtorso: '<ellipse cx="0" cy="15" rx="25" ry="20"/>'
+  },
+  hair: {
+    none: '',
+    spiky: '<path d="M-22,0 L-15,-20 L-8,-5 L0,-24 L8,-5 L15,-20 L22,0 Q0,-10 -22,0 Z"/>',
+    short: '<path d="M-22,5 C-24,-20 24,-20 22,5 C12,-8 -12,-8 -22,5 Z"/>',
+    afro: '<circle cx="0" cy="-5" r="24"/>',
+    mohawk: '<rect x="-6" y="-28" width="12" height="30" rx="4"/>',
+    long: '<path d="M-22,-10 C-24,-25 24,-25 22,-10 L24,25 Q0,15 -24,25 Z"/>',
+    bangs: '<path d="M-22,-5 C-22,-22 22,-22 22,-5 L15,5 L5,-5 L-5,5 L-15,-5 Z"/>'
+  },
+  acc: {
+    none: '',
+    glasses: '<g fill="none" stroke="currentColor" stroke-width="3"><circle cx="-10" cy="0" r="7"/><circle cx="10" cy="0" r="7"/><line x1="-3" y1="0" x2="3" y2="0"/></g>',
+    shades: '<g fill="currentColor"><path d="M-18,-5 L18,-5 L14,6 L-14,6 Z"/><line x1="-18" y1="-3" x2="-22" y2="-5" stroke="currentColor" stroke-width="2"/><line x1="18" y1="-3" x2="22" y2="-5" stroke="currentColor" stroke-width="2"/></g>',
+    crown: '<polygon points="-18,5 -20,-15 -8,-5 0,-20 8,-5 20,-15 18,5"/>',
+    cap: '<g fill="currentColor"><path d="M-20,0 C-20,-18 20,-18 20,0 Z"/><ellipse cx="10" cy="2" rx="16" ry="4"/></g>',
+    mask: '<rect x="-18" y="-4" width="36" height="18" rx="4"/>',
+    star: '<polygon points="0,-15 4,-4 15,-4 7,3 10,14 0,7 -10,14 -7,3 -15,-4 -4,-4"/>',
+    headband: '<rect x="-24" y="-10" width="48" height="8" rx="2"/>'
+  }
+};
+
+function normalizeAvatarState(raw){
+  if(raw && raw.head && raw.body) return raw;
+  return {
+    version: 2,
+    head: { shape: 'circle', color: (raw && raw.skin) || '#f3c19a', x: 0, y: -5, scale: 1, rot: 0 },
+    body: { shape: 'torso', color: (raw && raw.outfitColor) || '#ff6b6b', x: 0, y: 25, scale: 1, rot: 0 },
+    hair: { shape: (raw && raw.hairStyle === 'bald' ? 'none' : 'spiky'), color: (raw && raw.hairColor) || '#1d1d1d', x: 0, y: -22, scale: 1, rot: 0 },
+    acc:  { shape: 'none', color: '#1a1a1a', x: 0, y: -5, scale: 1, rot: 0 }
+  };
 }
 
-function renderAvatarSVG(a, size){
-  a = a || avatarState;
-  const skin     = a.skin     || AV.skin[1];
-  const hairColor= a.hairColor|| AV.hairColor[0];
-  const hairStyle= a.hairStyle|| 'short';
-  const facialHair = a.facialHair || 'none';
-  const brows    = a.brows    || 'natural';
-  const eyes     = a.eyes     || 'round';
-  const eyeColor = a.eyeColor || AV.eyeColor[0];
-  const mouth    = a.mouth    || 'smile';
-  const nose     = a.nose     || 'small';
-  const cheeks   = a.cheeks   || 'none';
-  const faceAcc  = a.faceAcc  || 'none';
-  const headgear = a.headgear || 'none';
-  const outfit   = a.outfit   || 'tee';
-  const outfitColor = a.outfitColor || AV.outfitColor[0];
-  const bg       = a.bg       || 'none';
-  const dark     = shade(outfitColor, .72);
-  const neck     = shade(skin, .9);
+function renderAvatarSVG(rawState, size){
+  const state = normalizeAvatarState(rawState || avatarState);
+  const layers = [
+    { key: 'body', defaultY: 25 },
+    { key: 'head', defaultY: -5 },
+    { key: 'hair', defaultY: -22 },
+    { key: 'acc',  defaultY: -5 }
+  ];
 
-  const p = [];
+  const svgParts = ['<rect width="100" height="100" fill="#1f1838" rx="50"/>'];
 
-  if(bg !== 'none') p.push(`<rect width="100" height="100" fill="${bg}"/>`);
+  layers.forEach(({ key, defaultY }) => {
+    const l = state[key] || {};
+    const shapeSvg = (AV_SHAPES[key] && AV_SHAPES[key][l.shape]) || '';
+    if (!shapeSvg) return;
 
-  if(hairStyle === 'long') p.push(`<path d="M27 40 Q50 16 73 40 L75 80 Q50 89 25 79 Z" fill="${hairColor}"/>`);
-  if(hairStyle === 'ponytail') p.push(`<path d="M72 40 Q83 58 72 78 Q81 52 70 42 Z" fill="${hairColor}"/>`);
+    const x = 50 + (l.x || 0);
+    const y = 50 + (l.y !== undefined ? l.y : defaultY);
+    const scale = l.scale !== undefined ? l.scale : 1;
+    const rot = l.rot || 0;
+    const color = l.color || '#ffffff';
 
-  // torso by outfit
-  const base = `<path d="M28 70 C30 62 39 58 50 58 C61 58 70 62 72 70 L78 100 L22 100 Z" fill="${outfitColor}"/>`;
-  let body = base;
-  if(outfit === 'tee') body = base + `<path d="M28 70 L20 86 L30 91 Z" fill="${dark}"/><path d="M72 70 L80 86 L70 91 Z" fill="${dark}"/><path d="M44 58 Q50 63 56 58 Q50 56.5 44 58 Z" fill="${dark}"/>`;
-  else if(outfit === 'hoodie') body = base + `<path d="M41 58 Q50 70 59 58 L57 45 L43 45 Z" fill="${dark}"/><path d="M35 78 Q50 90 65 78 L65 84 Q50 97 35 84 Z" fill="${dark}"/><path d="M47 50 L49 68 M53 50 L51 68" stroke="#fff" stroke-width="1.3" opacity=".7"/>`;
-  else if(outfit === 'jacket') body = base + `<path d="M45.5 58 L50 74 L50 100 M54.5 58 L50 74" stroke="#00000055" stroke-width="2"/><path d="M40 59 L46 72 L44 86 Q38 78 37 68 Z" fill="${dark}"/><path d="M60 59 L54 72 L56 86 Q62 78 63 68 Z" fill="${dark}"/>`;
-  else if(outfit === 'jersey') body = base + `<path d="M28 74 L35 100 L33 100 L26 76 Z" fill="${dark}" opacity=".85"/><path d="M72 74 L65 100 L67 100 L74 76 Z" fill="${dark}" opacity=".85"/><text x="50" y="91" font-size="19" font-weight="800" fill="#fff" opacity=".85" text-anchor="middle" font-family="Arial">96</text>`;
-  else if(outfit === 'suit') body = `<path d="M28 70 C30 61 40 56 50 56 C60 56 70 61 72 70 L78 100 L22 100 Z" fill="#232638"/><path d="M45 59 L50 70 L55 59 L50 63 Z" fill="#e8dcc0"/><path d="M48 64 L52 64 L50 88 L47 64 Z" fill="#d43f52"/><path d="M41 57 L45 60 L43 84 Z" fill="#1c1f2e"/><path d="M59 57 L55 60 L57 84 Z" fill="#1c1f2e"/>`;
-  else if(outfit === 'robe') body = `<path d="M24 100 L32 59 L68 59 L76 100 Z" fill="${outfitColor}"/><path d="M42 59 L50 76 L58 59 Q50 66 42 59 Z" fill="${dark}"/>`;
-  else if(outfit === 'armor') body = base + `<path d="M39 62 L61 62 L57 86 L43 86 Z" fill="#b9bcc7"/><path d="M44 62 L56 62 L53 78 L47 78 Z" fill="#8e93a3"/><circle cx="27" cy="67" r="6.5" fill="#a6aab8"/><circle cx="73" cy="67" r="6.5" fill="#a6aab8"/><rect x="49" y="62" width="2" height="20" fill="#7a7f90"/>`;
-  p.push(body);
+    svgParts.push(`
+      <g transform="translate(${x}, ${y}) rotate(${rot}) scale(${scale})" fill="${color}" color="${color}">
+        ${shapeSvg}
+      </g>
+    `);
+  });
 
-  p.push(`<rect x="44" y="57" width="12" height="11" rx="4" fill="${neck}"/>`);
-  p.push(`<ellipse cx="23" cy="47" rx="6" ry="10" fill="${skin}"/><ellipse cx="77" cy="47" rx="6" ry="10" fill="${skin}"/>`);
-  p.push(`<circle cx="50" cy="45" r="26" fill="${skin}"/>`);
-
-  // cheeks
-  if(cheeks === 'blush') p.push(`<ellipse cx="35" cy="54" rx="4.8" ry="2.7" fill="#ff5d8c" opacity=".35"/><ellipse cx="65" cy="54" rx="4.8" ry="2.7" fill="#ff5d8c" opacity=".35"/>`);
-  else if(cheeks === 'freckles') p.push(`<circle cx="32.5" cy="51.5" r=".9" fill="#7a4a2a"/><circle cx="35.5" cy="53.5" r=".9" fill="#7a4a2a"/><circle cx="33.5" cy="55" r=".9" fill="#7a4a2a"/><circle cx="67.5" cy="51.5" r=".9" fill="#7a4a2a"/><circle cx="64.5" cy="53.5" r=".9" fill="#7a4a2a"/><circle cx="66.5" cy="55" r=".9" fill="#7a4a2a"/>`);
-
-  // nose
-  if(nose === 'small') p.push(`<path d="M50 50 Q52 54 47.5 55.5" stroke="${shade(skin,.78)}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`);
-  else if(nose === 'button') p.push(`<ellipse cx="50" cy="54.5" rx="2.7" ry="2.1" fill="${shade(skin,.78)}"/>`);
-  else if(nose === 'pointy') p.push(`<path d="M50 49.5 L53.5 56 L46.5 56 Z" fill="${shade(skin,.8)}" opacity=".72"/>`);
-
-  // mouth
-  if(mouth === 'smile') p.push(`<path d="M43.5 59.5 Q50 66 56.5 59.5" stroke="#5a2a1a" stroke-width="2.4" fill="none" stroke-linecap="round"/>`);
-  else if(mouth === 'grin') p.push(`<path d="M42.5 59 Q50 68 57.5 59 Q50 63 42.5 59 Z" fill="#5a2a1a"/>`);
-  else if(mouth === 'neutral') p.push(`<path d="M44.5 61 L55.5 61" stroke="#5a2a1a" stroke-width="2.2" stroke-linecap="round"/>`);
-  else if(mouth === 'open') p.push(`<ellipse cx="50" cy="62" rx="4.2" ry="4.8" fill="#5a2a1a"/><ellipse cx="50" cy="63.4" rx="2.4" ry="1.9" fill="#ff8f9a"/>`);
-  else if(mouth === 'smirk') p.push(`<path d="M43 61.5 Q48.5 66.5 55.5 62" stroke="#5a2a1a" stroke-width="2.4" fill="none" stroke-linecap="round"/>`);
-  else if(mouth === 'frown') p.push(`<path d="M44 63.5 Q50 58.5 56 63.5" stroke="#5a2a1a" stroke-width="2.4" fill="none" stroke-linecap="round"/>`);
-
-  // facial hair
-  if(facialHair === 'mustache') p.push(`<path d="M42.5 57.5 Q50 60.5 57.5 57.5 Q50 55 42.5 57.5 Z" fill="${hairColor}"/>`);
-  else if(facialHair === 'stubble') p.push(`<path d="M37.5 60 Q50 71 62.5 60 L62.5 64 Q50 75.5 37.5 64 Z" fill="${hairColor}" opacity=".22"/>`);
-  else if(facialHair === 'goatee') p.push(`<path d="M42.5 57.5 Q50 60.5 57.5 57.5 Q50 55 42.5 57.5 Z" fill="${hairColor}"/><path d="M45.5 62 L54.5 62 Q53 72 50 72 Q47 72 45.5 62 Z" fill="${hairColor}"/>`);
-  else if(facialHair === 'beard') p.push(`<path d="M43 50 Q50 53 57 50 L56 57 Q50 60 44 57 Z" fill="${hairColor}" opacity=".8"/><path d="M37.5 61.5 Q50 72 62.5 61.5 L62 67 Q50 78.5 38 67 Z" fill="${hairColor}"/><path d="M42.5 57.5 Q50 60.5 57.5 57.5 Q50 55 42.5 57.5 Z" fill="${hairColor}"/>`);
-
-  // eyes
-  function eye(cx){
-    if(eyes === 'happy') return `<path d="M${cx-4} 47 Q${cx} 51 ${cx+4} 47" stroke="#2b2b2b" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
-    if(eyes === 'sleepy') return `<path d="M${cx-4} 47 L${cx+4} 47" stroke="#2b2b2b" stroke-width="2.4" stroke-linecap="round"/>`;
-    if(eyes === 'cool') return `<ellipse cx="${cx}" cy="47" rx="3.8" ry="4.4" fill="#fff"/><path d="M${cx-2.2} 47 L${cx+2.2} 47" stroke="#2b2b2b" stroke-width="1.8" stroke-linecap="round"/><path d="M${cx-3.8} 43.4 L${cx+3.8} 43.4" stroke="#2b2b2b" stroke-width="1.8" stroke-linecap="round"/>`;
-    const ir = eyes === 'anime' ? 4 : 3;
-    const hr = eyes === 'anime' ? 1.7 : 1.1;
-    return `<ellipse cx="${cx}" cy="47" rx="${ir+.7}" ry="${ir+1.3}" fill="#fff"/><circle cx="${cx}" cy="47" r="${ir}" fill="${eyeColor}"/><circle cx="${cx+ir*.35}" cy="${47-ir*.35}" r="${hr}" fill="#fff"/>`;
-  }
-  p.push(eye(40), eye(60));
-
-  // brows
-  function brow(cx){
-    const L = cx-3.8, R = cx+3.8, y = 40;
-    if(brows === 'thick') return `<path d="M${L} ${y+1} Q${cx} ${y-2.5} ${R} ${y+1}" stroke="${hairColor}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`;
-    if(brows === 'thin') return `<path d="M${L} ${y+1.5} L${R} ${y+1.5}" stroke="${hairColor}" stroke-width="1.4" stroke-linecap="round"/>`;
-    if(brows === 'angled') return `<path d="M${L} ${y+3} L${R} ${y-1}" stroke="${hairColor}" stroke-width="2.4" stroke-linecap="round"/>`;
-    if(brows === 'bushy') return `<path d="M${L-1.5} ${y+3} Q${cx} ${y-4.5} ${R+1.5} ${y+3} L${R} ${y} Q${cx} ${y-5} ${L} ${y} Z" fill="${hairColor}"/>`;
-    return `<path d="M${L} ${y+1} Q${cx} ${y-1.5} ${R} ${y+1}" stroke="${hairColor}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
-  }
-  p.push(brow(40), brow(60));
-
-  // front hair
-  if(hairStyle === 'short') p.push(`<path d="M24 42 C27 18 73 18 76 42 C70 35 60 32 50 32 C40 32 30 35 24 42 Z" fill="${hairColor}"/>`);
-  else if(hairStyle === 'spiky') p.push(`<path d="M24 42 L30 20 L38 34 L46 15 L54 34 L62 17 L70 34 L76 40 Z" fill="${hairColor}"/>`);
-  else if(hairStyle === 'curly') p.push(`<circle cx="33" cy="29" r="11" fill="${hairColor}"/><circle cx="50" cy="24" r="12" fill="${hairColor}"/><circle cx="67" cy="29" r="11" fill="${hairColor}"/><circle cx="25" cy="39" r="8" fill="${hairColor}"/><circle cx="75" cy="39" r="8" fill="${hairColor}"/>`);
-  else if(hairStyle === 'long') p.push(`<path d="M26 43 Q29 26 42 26 Q50 30 42 26 Q50 22 58 26 Q71 26 74 43 Q72 36 66 34 Q58 32 50 32 Q42 32 34 34 Q28 36 26 43 Z" fill="${hairColor}"/>`);
-  else if(hairStyle === 'bun') p.push(`<path d="M27 42 Q50 20 73 42 C60 30 40 30 27 42 Z" fill="${hairColor}"/><circle cx="50" cy="14" r="8" fill="${hairColor}"/>`);
-  else if(hairStyle === 'fro') p.push(`<path d="M25 43 C20 22 80 22 75 43 C68 28 32 28 25 43 Z" fill="${hairColor}"/><path d="M42 14 a12 12 0 0 1 16 0" stroke="${hairColor}" stroke-width="7" fill="none" stroke-linecap="round"/>`);
-  else if(hairStyle === 'ponytail') p.push(`<path d="M26 43 Q27 20 50 19 Q73 20 74 43 Q73 33 68 30 Q50 24 32 30 Q27 33 26 43 Z" fill="${hairColor}"/><circle cx="71" cy="40" r="3.2" fill="${dark}"/>`);
-  else if(hairStyle === 'bangs') p.push(`<path d="M24 42 Q30 25 40 27 Q44 20 50 24 Q54 20 60 27 Q70 25 76 42 Q60 33 50 33 Q40 33 24 42 Z" fill="${hairColor}"/>`);
-  else if(hairStyle === 'mohawk') p.push(`<path d="M45 43 L45 20 Q50 13 55 20 L55 43 Z" fill="${hairColor}"/>`);
-
-  // face accessory
-  if(faceAcc === 'glasses') p.push(`<circle cx="40" cy="47" r="7.2" fill="#0000000a" stroke="#332b45" stroke-width="2.2"/><circle cx="60" cy="47" r="7.2" fill="#0000000a" stroke="#332b45" stroke-width="2.2"/><path d="M47.2 47 L52.8 47" stroke="#332b45" stroke-width="2.2"/><path d="M32.8 45.5 L25.5 44.5" stroke="#332b45" stroke-width="2.2"/><path d="M67.2 45.5 L74.5 44.5" stroke="#332b45" stroke-width="2.2"/>`);
-  else if(faceAcc === 'shades') p.push(`<path d="M33 43 a7 7 0 0 1 14 0 l-1 5 a7 7 0 0 0 -12 0 Z" fill="#1a1a1a"/><path d="M53 43 a7 7 0 0 1 14 0 l-1 5 a7 7 0 0 0 -12 0 Z" fill="#1a1a1a"/><path d="M47 46 L53 46" stroke="#1a1a1a" stroke-width="2.2"/><path d="M33 44 L25.5 43.5" stroke="#1a1a1a" stroke-width="2.2"/><path d="M67 44 L74.5 43.5" stroke="#1a1a1a" stroke-width="2.2"/>`);
-
-  // headgear
-  if(headgear === 'cap') p.push(`<path d="M25 40 Q50 13 75 40 L75 33 Q50 7 25 33 Z" fill="${outfitColor}"/><ellipse cx="59" cy="35" rx="17" ry="5" fill="${dark}"/>`);
-  else if(headgear === 'beanie') p.push(`<path d="M26 42 Q50 12 74 42 L76 33 Q50 18 24 33 Z" fill="${outfitColor}"/><path d="M24 40 Q50 30 76 40 L74 47 Q50 38 26 47 Z" fill="${dark}"/><circle cx="50" cy="16" r="2.4" fill="#fff" opacity=".7"/>`);
-  else if(headgear === 'crown') p.push(`<path d="M32 45 L34 25 L42 34 L50 23 L58 34 L66 25 L68 45 Z" fill="#ffd54a" stroke="#b8860b" stroke-width="1.6"/><path d="M44 42 L47 36 L51 42 L54 37 L56 42 Z" fill="#ff6b6b"/>`);
-  else if(headgear === 'headband') p.push(`<path d="M24 34 Q50 26 76 34 L75 40 Q50 32 25 40 Z" fill="${outfitColor}"/>`);
-  else if(headgear === 'bandana') p.push(`<path d="M26 43 Q50 21 74 43 L72 49 L28 49 Z" fill="${outfitColor}"/><path d="M28 47 L21 64 L33 61 Z" fill="${dark}"/>`);
-  else if(headgear === 'tophat') p.push(`<rect x="36" y="23" width="28" height="19" rx="2" fill="#1c2430"/><rect x="30" y="40" width="40" height="4.4" rx="2" fill="#1c2430"/><rect x="36" y="23" width="28" height="5" fill="#3a4250"/>`);
-
-  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-label="avatar">${p.join('')}</svg>`;
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-label="avatar">${svgParts.join('')}</svg>`;
 }
 
 /* ---------------- In-game dialog (no system alerts) ---------------- */
@@ -1125,46 +1047,130 @@ document.getElementById('confirmOpenGiftBtn').onclick = async () => {
   }catch(e){ toast(e.message); }
 };
 
-/* ---------------- Avatar editor ---------------- */
+/* ---------------- COD Emblem Studio Editor Logic ---------------- */
 function renderAvatarEditor(){
+  avatarState = normalizeAvatarState(avatarState);
   const prevWrap = document.getElementById('avatarPreview');
-  prevWrap.outerHTML = renderAvatarSVG(avatarState, 180).replace('<svg', '<svg id="avatarPreview" style="width:100%;height:100%;"').replace('width="180" height="180"', '');
+  if(prevWrap){
+    prevWrap.outerHTML = renderAvatarSVG(avatarState, 180).replace('<svg', '<svg id="avatarPreview" style="width:100%;height:100%;"').replace('width="180" height="180"', '');
+  }
 
-  bindSwatches('swatchSkin', AV.skin, avatarState.skin, c=>{ avatarState.skin = c; renderAvatarEditor(); }, false);
-  bindSwatches('swatchHairColor', AV.hairColor, avatarState.hairColor, c=>{ avatarState.hairColor = c; renderAvatarEditor(); }, false);
-  bindSwatches('swatchEyeColor', AV.eyeColor, avatarState.eyeColor, c=>{ avatarState.eyeColor = c; renderAvatarEditor(); }, false);
-  bindSwatches('swatchOutfitColor', AV.outfitColor, avatarState.outfitColor, c=>{ avatarState.outfitColor = c; renderAvatarEditor(); }, false);
-  bindSwatches('swatchBg', AV.bg, avatarState.bg, c=>{ avatarState.bg = c; renderAvatarEditor(); }, true);
-
-  bindOpts('optHairStyle', AV.hairStyle, avatarState.hairStyle, v=>{ avatarState.hairStyle = v; renderAvatarEditor(); });
-  bindOpts('optFacialHair', AV.facialHair, avatarState.facialHair, v=>{ avatarState.facialHair = v; renderAvatarEditor(); });
-  bindOpts('optBrows', AV.brows, avatarState.brows, v=>{ avatarState.brows = v; renderAvatarEditor(); });
-  bindOpts('optEyes', AV.eyes, avatarState.eyes, v=>{ avatarState.eyes = v; renderAvatarEditor(); });
-  bindOpts('optNose', AV.nose, avatarState.nose, v=>{ avatarState.nose = v; renderAvatarEditor(); });
-  bindOpts('optMouth', AV.mouth, avatarState.mouth, v=>{ avatarState.mouth = v; renderAvatarEditor(); });
-  bindOpts('optCheeks', AV.cheeks, avatarState.cheeks, v=>{ avatarState.cheeks = v; renderAvatarEditor(); });
-  bindOpts('optFaceAcc', AV.faceAcc, avatarState.faceAcc, v=>{ avatarState.faceAcc = v; renderAvatarEditor(); });
-  bindOpts('optHeadgear', AV.headgear, avatarState.headgear, v=>{ avatarState.headgear = v; renderAvatarEditor(); });
-  bindOpts('optOutfit', AV.outfit, avatarState.outfit, v=>{ avatarState.outfit = v; renderAvatarEditor(); });
-}
-
-function bindSwatches(id, colors, selected, onChange, hasNone){
-  const box = document.getElementById(id);
-  box.innerHTML = (hasNone ? `<div class="swatch plain ${selected==='none'?'selected':''}" data-c="none">∅</div>` : '') +
-    colors.map(c=>`<div class="swatch ${selected===c?'selected':''}" style="background:${c}" data-c="${c}"></div>`).join('');
-  box.querySelectorAll('.swatch').forEach(s=>{
-    s.onclick = () => { onChange(s.dataset.c); };
+  // Update tabs
+  document.querySelectorAll('#avatarSectionTabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.sec === activeAvatarSec);
+    b.onclick = () => { activeAvatarSec = b.dataset.sec; renderAvatarEditor(); };
   });
-}
 
-function bindOpts(id, list, selected, onChange){
-  const box = document.getElementById(id);
-  box.innerHTML = list.map(v=>`<span class="opt-btn ${selected===v?'selected':''}" data-v="${v}">${v}</span>`).join('');
-  box.querySelectorAll('.opt-btn').forEach(b=>{
-    b.onclick = () => { onChange(b.dataset.v); };
+  const sec = activeAvatarSec;
+  const layer = avatarState[sec] || { shape: 'none', color: '#ffffff', x: 0, y: 0, scale: 1, rot: 0 };
+  const box = document.getElementById('avatarSectionControls');
+  if(!box) return;
+
+  const shapes = Object.keys(AV_SHAPES[sec] || {});
+  
+  box.innerHTML = `
+    <div class="ed-group">
+      <div class="ed-label">Choose Shape / Element</div>
+      <div class="shape-grid">
+        ${shapes.map(s => `<button class="shape-btn ${layer.shape===s?'selected':''}" data-s="${s}">${s}</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="ed-group">
+      <div class="ed-label">Layer Color</div>
+      <div class="swatches">
+        ${AV_COLORS.map(c => `<div class="swatch ${layer.color===c?'selected':''}" style="background:${c}" data-c="${c}"></div>`).join('')}
+        <input type="color" id="customColorPicker" value="${layer.color || '#ffffff'}" style="width:34px; height:34px; border:none; background:none; cursor:pointer; padding:0;">
+      </div>
+    </div>
+
+    <div class="ed-group">
+      <div class="ed-label">Position & Scale (COD Emblem Style)</div>
+      <div class="slider-row">
+        <label>Pos X</label>
+        <input type="range" id="slX" min="-35" max="35" value="${layer.x||0}">
+        <span class="val" id="valX">${layer.x||0}</span>
+      </div>
+      <div class="slider-row">
+        <label>Pos Y</label>
+        <input type="range" id="slY" min="-35" max="35" value="${layer.y||0}">
+        <span class="val" id="valY">${layer.y||0}</span>
+      </div>
+      <div class="slider-row">
+        <label>Scale</label>
+        <input type="range" id="slScale" min="0.3" max="2.5" step="0.1" value="${layer.scale!==undefined?layer.scale:1}">
+        <span class="val" id="valScale">${(layer.scale!==undefined?layer.scale:1).toFixed(1)}x</span>
+      </div>
+      <div class="slider-row">
+        <label>Rotate</label>
+        <input type="range" id="slRot" min="-180" max="180" step="5" value="${layer.rot||0}">
+        <span class="val" id="valRot">${layer.rot||0}°</span>
+      </div>
+    </div>
+  `;
+
+  // Bind shape pickers
+  box.querySelectorAll('.shape-btn').forEach(b => {
+    b.onclick = () => { avatarState[sec].shape = b.dataset.s; renderAvatarEditor(); };
+  });
+
+  // Bind swatches & color picker
+  box.querySelectorAll('.swatch').forEach(s => {
+    s.onclick = () => { avatarState[sec].color = s.dataset.c; renderAvatarEditor(); };
+  });
+  const cp = box.querySelector('#customColorPicker');
+  if(cp){
+    cp.oninput = (e) => { avatarState[sec].color = e.target.value; renderAvatarEditor(); };
+  }
+
+  // Bind transform sliders
+  const slX = box.querySelector('#slX'), valX = box.querySelector('#valX');
+  const slY = box.querySelector('#slY'), valY = box.querySelector('#valY');
+  const slScale = box.querySelector('#slScale'), valScale = box.querySelector('#valScale');
+  const slRot = box.querySelector('#slRot'), valRot = box.querySelector('#valRot');
+
+  const updateTransforms = () => {
+    avatarState[sec].x = parseInt(slX.value, 10);
+    avatarState[sec].y = parseInt(slY.value, 10);
+    avatarState[sec].scale = parseFloat(slScale.value);
+    avatarState[sec].rot = parseInt(slRot.value, 10);
+
+    valX.textContent = avatarState[sec].x;
+    valY.textContent = avatarState[sec].y;
+    valScale.textContent = avatarState[sec].scale.toFixed(1) + 'x';
+    valRot.textContent = avatarState[sec].rot + '°';
+
+    const p = document.getElementById('avatarPreview');
+    if(p) p.outerHTML = renderAvatarSVG(avatarState, 180).replace('<svg', '<svg id="avatarPreview" style="width:100%;height:100%;"').replace('width="180" height="180"', '');
+  };
+
+  [slX, slY, slScale, slRot].forEach(sl => {
+    if(sl) sl.oninput = updateTransforms;
   });
 }
 renderAvatarEditor();
+
+const resetBtn = document.getElementById('resetAvatarBtn');
+if(resetBtn){
+  resetBtn.onclick = () => {
+    avatarState = JSON.parse(JSON.stringify(defaultAvatarState));
+    renderAvatarEditor();
+  };
+}
+
+document.getElementById('randomizeAvatarBtn').onclick = () => {
+  const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+  const randRange = (min, max) => Math.floor(Math.random()*(max-min+1))+min;
+
+  avatarState = {
+    version: 2,
+    head: { shape: pick(Object.keys(AV_SHAPES.head)), color: pick(AV_COLORS), x: randRange(-5, 5), y: randRange(-10, 0), scale: (randRange(8, 12)/10), rot: randRange(-15, 15) },
+    body: { shape: pick(Object.keys(AV_SHAPES.body)), color: pick(AV_COLORS), x: randRange(-5, 5), y: randRange(20, 30), scale: (randRange(8, 12)/10), rot: randRange(-10, 10) },
+    hair: { shape: pick(Object.keys(AV_SHAPES.hair)), color: pick(AV_COLORS), x: randRange(-5, 5), y: randRange(-25, -15), scale: (randRange(8, 12)/10), rot: randRange(-20, 20) },
+    acc:  { shape: pick(Object.keys(AV_SHAPES.acc)),  color: pick(AV_COLORS), x: randRange(-5, 5), y: randRange(-10, 5), scale: (randRange(8, 12)/10), rot: randRange(-15, 15) }
+  };
+  renderAvatarEditor();
+};
 
 document.getElementById('randomizeAvatarBtn').onclick = () => {
   const pick = arr => arr[Math.floor(Math.random()*arr.length)];
