@@ -211,6 +211,29 @@
     font-family:'SF Mono',Menlo,monospace; font-size:24px; letter-spacing:4px; font-weight:700;
     text-align:center; padding:14px; background:var(--panel-2); border-radius:12px; color:var(--accent);
   }
+  #campaignTimerRow{
+    display:flex; align-items:center; justify-content:center; gap:10px; margin:0 0 8px;
+    background:var(--bg-deep); border-radius:999px; padding:8px 14px; border:1px solid #3a2c66;
+  }
+  #campaignTimerRow .campaign-label{font-size:12px; color:var(--muted);}
+  #campaignTimerRow .campaign-timer{font-size:20px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums;}
+  #campaignTimerRow .campaign-timer.danger{color:var(--bad);}
+  .cpg-tabs{display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;}
+  .cpg-tabs button{flex:1; min-width:100px; padding:10px; border-radius:12px; background:var(--panel-2); border:1px solid transparent; color:var(--muted); font-size:13px; font-weight:700;}
+  .cpg-tabs button.active{border-color:var(--accent); color:var(--accent); background:rgba(255,181,69,.10);}
+  .cpg-stages{display:grid; grid-template-columns:repeat(6,1fr); gap:8px;}
+  .cpg-stage{
+    aspect-ratio:1; border-radius:12px; background:var(--panel-2); border:1px solid #3a2c66;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    font-size:13px; font-weight:700; cursor:pointer; color:var(--text);
+  }
+  .cpg-stage:active{transform:scale(.94);}
+  .cpg-stage.clear{background:rgba(75,224,138,.12); border-color:var(--good);}
+  .cpg-stage .stars{font-size:11px; letter-spacing:1px;}
+  .cpg-stage .stars .gold{color:var(--accent);}
+  .cpg-stage .stars .dim{color:#4a3a80;}
+  .cpg-stage.locked{opacity:.32; cursor:default; background:#1a1030;}
+  .cpg-stage.dim{color:var(--muted);}
   select, textarea{
     background:var(--bg-deep); border:1px solid #4a3a80; color:var(--text); padding:10px;
     border-radius:10px; font-size:14px; width:100%;
@@ -421,8 +444,15 @@ tailscale funnel --https=8443 off                                # stop</pre>
 
     <!-- BATTLE -->
     <section class="screen" id="screen-battle">
+      <div class="card" id="campaignCard">
+        <h2>⛰️ Single-Player Campaign</h2>
+        <p class="muted" style="margin-top:-4px;">Chain through 30 stages per realm. Defeat each enemy <b>before the 60s timer runs out</b> — win faster for more stars!</p>
+        <div class="cpg-tabs" id="campaignRealmTabs"></div>
+        <div class="cpg-stages" id="campaignStageGrid"></div>
+        <p class="muted" style="font-size:11.5px; margin-top:10px; text-align:center;">⭐ Rewards: <b>1★</b> dust + XP · <b>2★</b> 2× dust + XP · <b>3★</b> 5× dust + XP <b>+ 1-3 TM!</b></p>
+      </div>
       <div class="card" id="battleLobby">
-        <h2>Battle Arena</h2>
+        <h2>⚔️ PvP Arena</h2>
         <div id="incomingChallenge" style="display:none; background:var(--panel-2); padding:12px; border-radius:12px; margin-bottom:12px;"></div>
         <p class="muted">Challenge a friend or battle level-scaled NPC monsters for turn-based combat anytime!</p>
         <select id="battleFriendSelect" style="margin-bottom:10px;"><option>Loading friends...</option></select>
@@ -461,6 +491,10 @@ tailscale funnel --https=8443 off                                # stop</pre>
                 <div class="be-chip">✨ <span id="beOpp">-- BE</span></div>
               </div>
             </div>
+          </div>
+          <div id="campaignTimerRow" style="display:none;">
+            <span class="campaign-label" id="campaignStageLabel">Stage 1</span>
+            <span class="campaign-timer" id="campaignTimer">60s</span>
           </div>
           <div class="battle-controls">
             <button class="btn secondary" id="attackBtn">👊 Attack</button>
@@ -532,7 +566,14 @@ let currentBattleId = null;
 let battlePollTimer = null;
 let challengePollTimer = null;
 let dustTickTimer = null;
+let campaignRealmData = [];
+let activeCampaignRealm = null;
+let campaignTimerId = null;
+let currentBattleMode = 'unknown';
+let currentCampaignDeadline = null;
+let campaignEnemyPending = false;
 const GIFT_OPEN_DAILY_LIMIT = 30;
+const CAMPAIGN_TIME_LIMIT = 60;
 
 /* ---------------- Splash / preload screen ---------------- */
 const splashEl = document.getElementById('splash');
@@ -801,6 +842,7 @@ function boot(){
   refreshGifts();
   refreshMissions();
   buildMoveList();
+  loadCampaign();
   dustTickTimer = setInterval(tickDustCountdown, 1000);
   challengePollTimer = setInterval(pollChallenges, 4000);
   setInterval(refreshProfile, 20000);
@@ -813,7 +855,7 @@ document.querySelectorAll('#tabbar .tab').forEach(btn => {
   btn.onclick = () => {
     switchTab(btn.dataset.screen);
     if(btn.dataset.screen === 'friends') refreshFriends();
-    if(btn.dataset.screen === 'battle') refreshFriends();
+    if(btn.dataset.screen === 'battle'){ refreshFriends(); loadCampaign(); }
     if(btn.dataset.screen === 'missions') refreshMissions();
   };
 });
@@ -845,6 +887,10 @@ async function refreshProfile(){
       return `<div class="row" style="padding:4px 0;"><span>${def}</span><span class="muted">${mins}m left</span></div>`;
     }).join('');
   } else { boostsCard.style.display='none'; }
+
+  // Re-render move list once profile is loaded (fixes race where the move
+  // list renders before /api/profile returns and stays empty).
+  if(window.ALL_MOVES && window.ALL_MOVES.length) renderMoveList();
 
   tickDustCountdown();
 }
@@ -1257,10 +1303,65 @@ async function learnMove(moveId){
     toast('Move learned!');
     profile = await api('/api/profile/' + PLAYER_ID);
     renderMoveList();
+    const sel = document.getElementById('specialMoveSelect');
+    if(sel) sel.dataset.built = '0';
   }catch(e){ toast(e.message); }
 }
 function pickMoveToReplace(id){
   closeDialog({ ok: true, value: id });
+}
+
+/* ---------------- Campaign (Single-Player) ---------------- */
+async function loadCampaign(){
+  if(!PLAYER_ID) return;
+  try{
+    campaignRealmData = await api('/api/campaign/' + PLAYER_ID);
+  }catch(e){ return; }
+  if(!activeCampaignRealm && campaignRealmData.length){
+    activeCampaignRealm = campaignRealmData[0].id;
+  }
+  renderCampaignUI();
+}
+
+function renderCampaignUI(){
+  const tabsBox = document.getElementById('campaignRealmTabs');
+  const gridBox = document.getElementById('campaignStageGrid');
+  if(!campaignRealmData.length){
+    tabsBox.innerHTML = '<p class="muted">No campaign data yet.</p>';
+    gridBox.innerHTML = '';
+    return;
+  }
+  tabsBox.innerHTML = campaignRealmData.map(r => `
+    <button class="${r.id === activeCampaignRealm ? 'active' : ''}" onclick="selectCampaignRealm('${r.id}')">${r.emoji} ${escapeHtml(r.name)}</button>
+  `).join('');
+
+  const realm = campaignRealmData.find(r => r.id === activeCampaignRealm) || campaignRealmData[0];
+  gridBox.innerHTML = realm.stages.map(st => {
+    if(st.unlocked){
+      const stars = '★'.repeat(st.stars) + `<span class="dim">${'★'.repeat(3 - st.stars)}</span>`;
+      const cls = st.stars > 0 ? 'clear' : '';
+      return `<button class="cpg-stage ${cls}" onclick="startCampaignStage('${realm.id}', ${st.stage})">
+        <span>${st.stage}</span>
+        <span class="stars">${st.stars ? stars : '<span class="dim">☆</span>'}</span>
+      </button>`;
+    }
+    return `<button class="cpg-stage locked" disabled>
+      <span>${st.stage}</span><span class="stars">🔒</span>
+    </button>`;
+  }).join('');
+}
+
+function selectCampaignRealm(realmId){
+  activeCampaignRealm = realmId;
+  renderCampaignUI();
+}
+
+async function startCampaignStage(realmId, stageIndex){
+  try{
+    const r = await api('/api/campaign/start', 'POST', { player_id: PLAYER_ID, realm_id: realmId, stage_index: stageIndex });
+    const realm = campaignRealmData.find(x => x.id === realmId);
+    enterBattle(r.battle_id, 'campaign', `${(realm?realm.name+' — ':'')}Stage ${stageIndex}`);
+  }catch(e){ toast(e.message); }
 }
 
 /* ---------------- Battle ---------------- */
@@ -1310,11 +1411,22 @@ async function respondChallenge(challengeId, accept){
   }catch(e){ toast(e.message); }
 }
 
-function enterBattle(battleId){
+function enterBattle(battleId, mode, label){
   currentBattleId = battleId;
+  currentBattleMode = mode || 'unknown';
   document.getElementById('battleLobby').style.display = 'none';
+  document.getElementById('campaignCard').style.display = 'none';
   document.getElementById('battleArenaCard').style.display = 'block';
   document.getElementById('battleLog').innerHTML = '';
+  const timerRow = document.getElementById('campaignTimerRow');
+  if(mode === 'campaign'){
+    timerRow.style.display = 'flex';
+    document.getElementById('campaignStageLabel').textContent = label || 'Stage';
+    document.getElementById('campaignTimer').textContent = CAMPAIGN_TIME_LIMIT + 's';
+    updateCampaignTimer();
+  } else {
+    timerRow.style.display = 'none';
+  }
   updateBattleState();
   battlePollTimer = setInterval(updateBattleState, 1500);
 }
@@ -1322,10 +1434,15 @@ function enterBattle(battleId){
 function exitBattle(){
   currentBattleId = null;
   clearInterval(battlePollTimer);
+  clearTimeout(campaignTimerId);
+  currentCampaignDeadline = null;
   document.getElementById('battleLobby').style.display = 'block';
+  document.getElementById('campaignCard').style.display = 'block';
   document.getElementById('battleArenaCard').style.display = 'none';
+  document.getElementById('campaignTimerRow').style.display = 'none';
   refreshProfile();
   refreshFriends();
+  loadCampaign();
 }
 document.getElementById('leaveBattleBtn').onclick = exitBattle;
 
@@ -1333,18 +1450,28 @@ async function updateBattleState(){
   if(!currentBattleId) return;
   let s;
   try{ s = await api(`/api/battle/${currentBattleId}/state?player_id=${PLAYER_ID}`); }catch(e){ return; }
+  if(s.mode === 'campaign') currentBattleMode = 'campaign';
   renderBattleState(s);
   if(s.status === 'finished'){
     clearInterval(battlePollTimer);
-    let msg;
+    clearTimeout(campaignTimerId);
+    currentCampaignDeadline = null;
+    let msg, toastType;
     if(s.winner_id === s.you.player_id){
-      msg = '🏆 Victory!';
-      if(s.reward && s.reward.dust) msg += ' +' + s.reward.dust + ' dust';
-      if(s.reward && s.reward.xp) msg += ' +' + s.reward.xp + ' XP';
+      toastType = 'success';
+      if(s.reward && s.reward.stars){
+        const stars = '⭐'.repeat(s.reward.stars);
+        msg = `🏆 Victory! ${stars} ${s.reward.dust} dust, ${s.reward.xp} XP`;
+        if(s.reward.tm) msg += ` + ${s.reward.tm} TM`;
+      } else {
+        msg = '🏆 Victory!';
+        if(s.reward && s.reward.dust) msg += ' +' + s.reward.dust + ' dust';
+        if(s.reward && s.reward.xp) msg += ' +' + s.reward.xp + ' XP';
+      }
+      loadCampaign();
     }
-    else if(!s.winner_id) msg = 'Draw!';
-    else msg = 'Defeat — good fight!';
-    const toastType = s.winner_id === s.you.player_id ? 'success' : (!s.winner_id ? 'info' : 'error');
+    else if(!s.winner_id){ toastType = 'info'; msg = 'Draw!'; }
+    else { toastType = 'error'; msg = s.mode === 'campaign' ? 'Defeat — you ran out of time or fell!' : 'Defeat — good fight!'; }
     setTimeout(()=>toast(msg, toastType), 400);
   }
 }
@@ -1377,8 +1504,18 @@ function renderBattleState(s){
   document.getElementById('gaugeOppText').textContent = Math.floor(s.opponent.gauge) + '%';
   document.getElementById('beYou').textContent = s.you.be + ' BE';
   document.getElementById('beOpp').textContent = s.opponent.be + ' BE';
-  document.getElementById('specialBtn').disabled = s.you.gauge < 100 || s.status !== 'active';
-  document.getElementById('attackBtn').disabled = s.status !== 'active';
+  document.getElementById('specialBtn').disabled = s.you.gauge < 100 || s.status !== 'active' || campaignEnemyPending;
+  document.getElementById('attackBtn').disabled = s.status !== 'active' || campaignEnemyPending;
+
+  const timerRow = document.getElementById('campaignTimerRow');
+  if(s.mode === 'campaign'){
+    currentBattleMode = 'campaign';
+    timerRow.style.display = 'flex';
+    if(s.status === 'active' && s.time_left != null){
+      currentCampaignDeadline = Date.now()/1000 + s.time_left;
+    }
+    updateCampaignTimer();
+  }
 
   const oppRec = document.getElementById('oppRecord');
   const friend = friendsCache.find(f=>f.id === s.opponent.player_id);
@@ -1399,21 +1536,62 @@ function renderBattleState(s){
   log.scrollTop = log.scrollHeight;
 }
 
-document.getElementById('attackBtn').onclick = async () => {
-  if(!currentBattleId) return;
-  try{
-    const s = await api(`/api/battle/${currentBattleId}/action`, 'POST', { player_id: PLAYER_ID, action: 'attack' });
-    renderBattleState(s);
-  }catch(e){ toast(e.message); }
+async function sendBattleAction(action, moveId){
+  if(!currentBattleId || campaignEnemyPending) return;
+  const isCampaign = currentBattleMode === 'campaign';
+  const body = { player_id: PLAYER_ID, action };
+  if(moveId) body.move_id = moveId;
+  if(isCampaign) body.phase = 'player';
+  const s = await api(`/api/battle/${currentBattleId}/action`, 'POST', body);
+  renderBattleState(s);
+  if(isCampaign && s.status === 'active'){
+    campaignEnemyPending = true;
+    setTimeout(async () => {
+      try{
+        const s2 = await api(`/api/battle/${currentBattleId}/action`, 'POST', { player_id: PLAYER_ID, action: 'attack', phase: 'enemy' });
+        campaignEnemyPending = false;
+        renderBattleState(s2);
+        if(s2.status === 'finished') updateBattleState();
+      }catch(e){
+        campaignEnemyPending = false;
+        updateBattleState();
+      }
+    }, 1500);
+  }
+  if(s.status === 'finished') updateBattleState();
+}
+
+document.getElementById('attackBtn').onclick = () => {
+  sendBattleAction('attack', null).catch(e => toast(e.message));
 };
-document.getElementById('specialBtn').onclick = async () => {
-  if(!currentBattleId) return;
+document.getElementById('specialBtn').onclick = () => {
   const moveId = document.getElementById('specialMoveSelect').value;
-  try{
-    const s = await api(`/api/battle/${currentBattleId}/action`, 'POST', { player_id: PLAYER_ID, action: 'special', move_id: moveId });
-    renderBattleState(s);
-  }catch(e){ toast(e.message); }
+  sendBattleAction('special', moveId).catch(e => toast(e.message));
 };
+
+function updateCampaignTimer(){
+  clearTimeout(campaignTimerId);
+  const el = document.getElementById('campaignTimer');
+  if(!el) return;
+  if(!currentCampaignDeadline){
+    el.textContent = CAMPAIGN_TIME_LIMIT + 's';
+    return;
+  }
+  const tick = () => {
+    if(!currentCampaignDeadline){ el.textContent = '0s'; return; }
+    const left = currentCampaignDeadline - Date.now()/1000;
+    if(left <= 0){
+      el.textContent = '0s';
+      el.classList.add('danger');
+      currentCampaignDeadline = null;
+      return;
+    }
+    el.textContent = Math.ceil(left) + 's';
+    el.classList.toggle('danger', left <= 10);
+    campaignTimerId = setTimeout(tick, 250);
+  };
+  tick();
+}
 
 /* ---------------- utils ---------------- */
 function escapeHtml(str){
