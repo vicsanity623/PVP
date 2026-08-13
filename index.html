@@ -551,7 +551,7 @@ const defaultAvatarState = {
 let avatarState = JSON.parse(JSON.stringify(defaultAvatarState));
 let activeAvatarSec = 'head';
 
-const AV_COLORS = ['#f9dcba','#f3c19a','#e7a874','#d18a52','#b06d3a','#1d1d1d','#4a2f1d','#ff6b6b','#ffb545','#4be08a','#5c8bff','#8a6cff','#e85a7a','#f1ecff'];
+const AV_COLORS = ['#f9dcba','#f3c19a','#e7a874','#d18a52','#b06d3a','#1d1d1d','#4a2f1d','#ff6b6b','#ffb545','#4be08a','#5c8bff','#8a6cff','#e85a7a','#f1ecff','#9b5de5','#00bbf9','#fee440','#00f5d4','#f15bb5','#333333'];
 
 const AV_SHAPES = {
   head: {
@@ -560,7 +560,9 @@ const AV_SHAPES = {
     rounded: '<rect x="-20" y="-22" width="40" height="44" rx="12"/>',
     square: '<rect x="-20" y="-20" width="40" height="40" rx="4"/>',
     triangle: '<polygon points="0,-24 22,18 -22,18"/>',
-    shield: '<path d="M-20,-20 L20,-20 Q20,10 0,25 Q-20,10 -20,-20 Z"/>'
+    shield: '<path d="M-20,-20 L20,-20 Q20,10 0,25 Q-20,10 -20,-20 Z"/>',
+    hexagon: '<polygon points="0,-22 19,-11 19,11 0,22 -19,11 -19,-11"/>',
+    gem: '<polygon points="0,-24 20,0 12,22 -12,22 -20,0"/>'
   },
   body: {
     none: '',
@@ -568,7 +570,9 @@ const AV_SHAPES = {
     rect: '<rect x="-22" y="-10" width="44" height="40" rx="6"/>',
     armor: '<path d="M-24,-8 L24,-8 L18,35 L-18,35 Z"/>',
     vshape: '<polygon points="-25,-10 25,-10 0,40"/>',
-    roundtorso: '<ellipse cx="0" cy="15" rx="25" ry="20"/>'
+    roundtorso: '<ellipse cx="0" cy="15" rx="25" ry="20"/>',
+    hoodie: '<path d="M-22,2 L-16,-16 L16,-16 L22,2 L24,40 L-24,40 Z"/><circle cx="0" cy="-10" r="8"/>',
+    suit: '<path d="M-20,-10 L20,-10 L26,40 L-26,40 Z M0,-10 L0,14 L-9,24 M0,-10 L0,14 L9,24"/>'
   },
   hair: {
     none: '',
@@ -577,7 +581,9 @@ const AV_SHAPES = {
     afro: '<circle cx="0" cy="-5" r="24"/>',
     mohawk: '<rect x="-6" y="-28" width="12" height="30" rx="4"/>',
     long: '<path d="M-22,-10 C-24,-25 24,-25 22,-10 L24,25 Q0,15 -24,25 Z"/>',
-    bangs: '<path d="M-22,-5 C-22,-22 22,-22 22,-5 L15,5 L5,-5 L-5,5 L-15,-5 Z"/>'
+    bangs: '<path d="M-22,-5 C-22,-22 22,-22 22,-5 L15,5 L5,-5 L-5,5 L-15,-5 Z"/>',
+    curly: '<g><circle cx="-14" cy="-12" r="8"/><circle cx="0" cy="-20" r="9"/><circle cx="14" cy="-12" r="8"/><circle cx="-8" cy="-4" r="7"/><circle cx="8" cy="-4" r="7"/></g>',
+    messy: '<path d="M-22,0 C-26,-14 -18,-22 -10,-20 C-12,-30 2,-32 10,-24 C18,-28 26,-20 22,-6 C28,-2 24,6 18,6 L-18,6 C-24,6 -26,-2 -22,0 Z"/>'
   },
   acc: {
     none: '',
@@ -587,7 +593,9 @@ const AV_SHAPES = {
     cap: '<g fill="currentColor"><path d="M-20,0 C-20,-18 20,-18 20,0 Z"/><ellipse cx="10" cy="2" rx="16" ry="4"/></g>',
     mask: '<rect x="-18" y="-4" width="36" height="18" rx="4"/>',
     star: '<polygon points="0,-15 4,-4 15,-4 7,3 10,14 0,7 -10,14 -7,3 -15,-4 -4,-4"/>',
-    headband: '<rect x="-24" y="-10" width="48" height="8" rx="2"/>'
+    headband: '<rect x="-24" y="-10" width="48" height="8" rx="2"/>',
+    halo: '<ellipse cx="0" cy="-24" rx="11" ry="4.5" fill="none" stroke="currentColor" stroke-width="2.5"/>',
+    scarf: '<rect x="-16" y="10" width="32" height="9" rx="4"/><path d="M10,13 L22,23 L18,29 L6,19 Z"/>'
   }
 };
 
@@ -1214,18 +1222,6 @@ document.getElementById('randomizeAvatarBtn').onclick = () => {
     body: { shape: pick(Object.keys(AV_SHAPES.body)), color: pick(AV_COLORS), x: randRange(-5, 5), y: randRange(20, 30), scale: (randRange(8, 12)/10), rot: randRange(-10, 10) },
     hair: { shape: pick(Object.keys(AV_SHAPES.hair)), color: pick(AV_COLORS), x: randRange(-5, 5), y: randRange(-25, -15), scale: (randRange(8, 12)/10), rot: randRange(-20, 20) },
     acc:  { shape: pick(Object.keys(AV_SHAPES.acc)),  color: pick(AV_COLORS), x: randRange(-5, 5), y: randRange(-10, 5), scale: (randRange(8, 12)/10), rot: randRange(-15, 15) }
-  };
-  renderAvatarEditor();
-};
-
-document.getElementById('randomizeAvatarBtn').onclick = () => {
-  const pick = arr => arr[Math.floor(Math.random()*arr.length)];
-  avatarState = {
-    skin: pick(AV.skin), hairColor: pick(AV.hairColor), hairStyle: pick(AV.hairStyle),
-    facialHair: pick(AV.facialHair), brows: pick(AV.brows), eyes: pick(AV.eyes),
-    eyeColor: pick(AV.eyeColor), mouth: pick(AV.mouth), nose: pick(AV.nose),
-    cheeks: pick(AV.cheeks), faceAcc: pick(AV.faceAcc), headgear: pick(AV.headgear),
-    outfit: pick(AV.outfit), outfitColor: pick(AV.outfitColor), bg: pick(AV.bg),
   };
   renderAvatarEditor();
 };
