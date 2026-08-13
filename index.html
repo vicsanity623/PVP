@@ -677,6 +677,98 @@ tailscale funnel --https=8443 off                                # stop</pre>
 </script>
 <script src="game.js"></script>
 <script>
+// Section 22 — Frontend data flow & polling enhancement
+(function() {
+  const originalApi = window.api || (typeof api !== 'undefined' ? api : null);
+  if (!originalApi) return;
+
+  const inFlight = new Map();
+  let isOffline = false;
+
+  // Create a subtle offline indicator banner
+  const offlineIndicator = document.createElement('div');
+  offlineIndicator.id = 'offlineIndicator';
+  offlineIndicator.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--bad, #ff5d6c);
+    color: #fff;
+    text-align: center;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 1100;
+    display: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    animation: fadeIn 0.2s ease;
+  `;
+  offlineIndicator.innerHTML = '⚠️ Connection lost. Reconnecting to GiftQuest...';
+  document.body.appendChild(offlineIndicator);
+
+  function setOfflineStatus(offline) {
+    if (isOffline !== offline) {
+      isOffline = offline;
+      offlineIndicator.style.display = offline ? 'block' : 'none';
+      if (!offline && typeof toast === 'function') {
+        toast('🟢 Connected back online!');
+      }
+    }
+  }
+
+  // Listen to browser online/offline events
+  window.addEventListener('online', () => setOfflineStatus(false));
+  window.addEventListener('offline', () => setOfflineStatus(true));
+
+  // Wrap the global api helper
+  window.api = async function(path, method = 'GET', body = null) {
+    const methodUpper = method.toUpperCase();
+    const isPoll = path.includes('/pending/') || path.includes('/state') || path.includes('/profile/') || path.includes('/missions/');
+
+    // Request Deduplication for GET requests
+    const key = `${methodUpper}:${path}:${body ? JSON.stringify(body) : ''}`;
+    if (methodUpper === 'GET') {
+      if (inFlight.has(key)) {
+        return inFlight.get(key);
+      }
+    }
+
+    const apiPromise = (async () => {
+      while (true) {
+        try {
+          if (!navigator.onLine) {
+            throw new Error('NetworkError: Browser is offline');
+          }
+          const res = await originalApi(path, method, body);
+          setOfflineStatus(false);
+          return res;
+        } catch (err) {
+          const isNetworkError = err.name === 'TypeError' || err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || !navigator.onLine;
+
+          if (isNetworkError) {
+            setOfflineStatus(true);
+            if (isPoll) {
+              // Wait until online, then retry
+              await new Promise(resolve => window.addEventListener('online', resolve, { once: true }));
+              continue;
+            }
+          }
+          throw err;
+        }
+      }
+    })();
+
+    if (methodUpper === 'GET') {
+      inFlight.set(key, apiPromise);
+      apiPromise.finally(() => inFlight.delete(key));
+    }
+
+    return apiPromise;
+  };
+})();
+</script>
+<script>
   // Section 22: Frontend data flow & polling enhancement
   // Wraps the global api helper with request deduplication and automatic retries with exponential backoff for transient network errors.
   (function() {
