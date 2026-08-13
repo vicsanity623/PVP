@@ -98,6 +98,14 @@
   .friend-info .name{font-weight:600; font-size:14px;}
   .friend-info .sub{font-size:12px; color:var(--muted);}
   .flevel{font-size:11px; background:var(--panel-2); padding:3px 8px; border-radius:999px; color:var(--accent);}
+  .friend-row .gift-btn{
+    font-size:20px; background:var(--panel-2); border:1px solid var(--accent); border-radius:12px;
+    padding:6px 9px; cursor:pointer; margin-left:8px; flex-shrink:0; transition:opacity .2s, transform .15s;
+  }
+  .friend-row .gift-btn:active{transform:scale(.9);}
+  .friend-row .gift-btn.greyed{opacity:.32; border-color:var(--muted); filter:grayscale(1); cursor:default;}
+  .gift-open-row{display:flex; align-items:center; gap:10px; padding:10px; background:var(--panel-2); border-radius:12px; margin-top:12px;}
+  .gift-open-row .gift-big{font-size:34px; flex-shrink:0;}
   #toast{
     position:fixed; top:calc(env(safe-area-inset-top) + 8px); left:50%; transform:translateX(-50%) scale(.85);
     background:rgba(0,0,0,.88); color:#fff; padding:11px 20px; border-radius:12px; font-size:14px;
@@ -370,27 +378,8 @@ tailscale funnel --https=8443 off                                # stop</pre>
       </div>
       <div class="card">
         <h2>Your Friends</h2>
+        <p class="muted" id="giftOpenCount" style="margin:-6px 0 8px;"></p>
         <div id="friendsList"><p class="muted">No friends yet — add one above!</p></div>
-      </div>
-    </section>
-
-    <!-- GIFTS -->
-    <section class="screen" id="screen-gifts">
-      <div class="card">
-        <h2>Send a Gift</h2>
-        <select id="giftFriendSelect"><option>Loading friends...</option></select>
-        <div class="postcard-tabs" style="margin-top:12px;">
-          <button class="active" data-ptype="none">No postcard</button>
-          <button data-ptype="image">Photo</button>
-          <button data-ptype="gif">GIF</button>
-        </div>
-        <div id="postcardArea"></div>
-        <button class="btn block" id="sendGiftBtn" style="margin-top:12px;">Send Gift</button>
-        <p class="muted" id="sendGiftStatus" style="margin-top:6px;"></p>
-      </div>
-      <div class="card">
-        <h2>Inbox</h2>
-        <div id="giftInbox"><p class="muted">No gifts yet.</p></div>
       </div>
     </section>
 
@@ -493,7 +482,6 @@ tailscale funnel --https=8443 off                                # stop</pre>
   <nav id="tabbar">
     <button class="tab active" data-screen="home"><span class="ic">🏠</span>Home</button>
     <button class="tab" data-screen="friends"><span class="ic">👥</span>Friends</button>
-    <button class="tab" data-screen="gifts"><span class="ic">🎁</span>Gifts</button>
     <button class="tab" data-screen="avatar"><span class="ic">🧑</span>Avatar</button>
     <button class="tab" data-screen="missions"><span class="ic">🎯</span>Missions</button>
     <button class="tab" data-screen="battle"><span class="ic">⚔️</span>Battle</button>
@@ -544,8 +532,7 @@ let currentBattleId = null;
 let battlePollTimer = null;
 let challengePollTimer = null;
 let dustTickTimer = null;
-let selectedPostcardType = 'none';
-let pendingPostcardData = '';
+const GIFT_OPEN_DAILY_LIMIT = 30;
 
 /* ---------------- Splash / preload screen ---------------- */
 const splashEl = document.getElementById('splash');
@@ -826,7 +813,6 @@ document.querySelectorAll('#tabbar .tab').forEach(btn => {
   btn.onclick = () => {
     switchTab(btn.dataset.screen);
     if(btn.dataset.screen === 'friends') refreshFriends();
-    if(btn.dataset.screen === 'gifts') refreshGifts();
     if(btn.dataset.screen === 'battle') refreshFriends();
     if(btn.dataset.screen === 'missions') refreshMissions();
   };
@@ -928,6 +914,9 @@ async function refreshFriends(){
     friendsCache = await api('/api/friends/' + PLAYER_ID);
   }catch(e){ return; }
   const list = document.getElementById('friendsList');
+  const opensLeft = friendsCache.length ? friendsCache[0].opens_left : 0;
+  const openLimit = friendsCache.length ? friendsCache[0].open_limit : GIFT_OPEN_DAILY_LIMIT;
+  document.getElementById('giftOpenCount').textContent = `🎁 Gifts you can open today: ${opensLeft}/${openLimit}`;
   if(!friendsCache.length){
     list.innerHTML = '<p class="muted">No friends yet — add one above!</p>';
   } else {
@@ -939,23 +928,27 @@ async function refreshFriends(){
           <div class="sub">Lv ${f.level} · ${f.pvp_wins}-${f.pvp_losses} PvP</div>
         </div>
         <div class="flevel">Friend Lv ${f.friendship_level}</div>
+        <button class="gift-btn ${f.gift_from_friend && f.opens_left > 0 ? '' : 'greyed'}" onclick="event.stopPropagation(); tapFriendGift('${f.id}')" title="Open gift from ${escapeHtml(f.username)}">🎁</button>
       </div>
     `).join('');
   }
 
-  const giftSel = document.getElementById('giftFriendSelect');
   const battleSel = document.getElementById('battleFriendSelect');
   if(friendsCache.length){
-    const opts = friendsCache.map(f=>`<option value="${f.id}">${escapeHtml(f.username)} (Lv ${f.level})</option>`).join('');
-    giftSel.innerHTML = opts;
     battleSel.innerHTML = friendsCache.map(f=>{
       const locked = !f.pvp_unlocked;
       return `<option value="${f.id}" ${locked?'disabled':''}>${escapeHtml(f.username)} ${locked? '(friend lv '+f.friendship_level+'/10 to unlock)':''}</option>`;
     }).join('');
   } else {
-    giftSel.innerHTML = '<option value="">Add a friend first</option>';
     battleSel.innerHTML = '<option value="">Add a friend first</option>';
   }
+}
+
+function tapFriendGift(friendId){
+  const f = friendsCache.find(x=>x.id===friendId);
+  if(!f || !f.gift_from_friend) { toast('No gift from this friend right now.'); return; }
+  if(f.opens_left <= 0) { toast('Daily gift limit reached — more tomorrow!'); return; }
+  openGiftModal(f.gift_from_friend, f.username);
 }
 
 document.getElementById('addFriendBtn').onclick = async () => {
@@ -990,124 +983,28 @@ function showFriendProfile(friendId){
       </div>
     </div>
     <p class="muted" style="margin-top:14px;">${f.pvp_unlocked ? 'Live PvP is unlocked with this friend! Head to the Battle tab.' : `Reach friendship level 10 (currently ${f.friendship_level}) to unlock live PvP battles together.`}</p>
+    <div class="gift-open-row">
+      <div class="gift-big">${f.gift_from_friend ? '🎁' : '📭'}</div>
+      <div style="flex:1;">
+        <strong>${f.gift_from_friend ? 'Gift waiting!' : 'No gift right now'}</strong>
+        <p class="muted" style="margin:2px 0 0; font-size:12px;">${f.gift_from_friend
+          ? `${escapeHtml(f.username)} sent you a gift — open it now!`
+          : `${escapeHtml(f.username)} hasn't sent you a gift today.`}</p>
+      </div>
+      ${f.gift_from_friend
+        ? `<button class="btn" onclick="tapFriendGift('${f.id}')">Open</button>`
+        : `<button class="btn secondary" disabled style="opacity:.4;">Open</button>`}
+    </div>
   `;
   document.getElementById('friendProfileModalBg').classList.add('show');
 }
 document.getElementById('closeFriendProfileModal').onclick = () => document.getElementById('friendProfileModalBg').classList.remove('show');
 
 /* ---------------- Gifts ---------------- */
-document.querySelectorAll('.postcard-tabs button').forEach(btn=>{
-  btn.onclick = () => {
-    document.querySelectorAll('.postcard-tabs button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedPostcardType = btn.dataset.ptype;
-    pendingPostcardData = '';
-    renderPostcardArea();
-  };
-});
-
-function renderPostcardArea(){
-  const area = document.getElementById('postcardArea');
-  if(selectedPostcardType === 'none'){
-    area.innerHTML = '';
-  } else if(selectedPostcardType === 'image'){
-    area.innerHTML = `
-      <input type="file" id="postcardFileInput" accept="image/*" capture="environment" style="margin-top:8px;">
-      <div id="postcardPreview" style="margin-top:8px;"></div>
-    `;
-    document.getElementById('postcardFileInput').onchange = (e) => {
-      const file = e.target.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        pendingPostcardData = reader.result;
-        document.getElementById('postcardPreview').innerHTML = `<img src="${reader.result}" style="max-width:100%;border-radius:8px;">`;
-      };
-      reader.readAsDataURL(file);
-    };
-  } else if(selectedPostcardType === 'gif'){
-    area.innerHTML = `
-      <input type="text" id="gifSearchInput" placeholder="Search GIFs...">
-      <p class="muted" style="font-size:11px; margin-top:6px;">GIF search requires a Tenor API key — add yours in TENOR_API_KEY. Without it, paste a direct GIF URL below.</p>
-      <input type="text" id="gifUrlInput" placeholder="...or paste a GIF URL directly" style="margin-top:8px;">
-      <div id="gifSearchResults"></div>
-    `;
-    let searchTimer;
-    document.getElementById('gifSearchInput').oninput = (e) => {
-      clearTimeout(searchTimer);
-      const q = e.target.value.trim();
-      if(!q || !TENOR_API_KEY) return;
-      searchTimer = setTimeout(()=>searchGifs(q), 400);
-    };
-    document.getElementById('gifUrlInput').onchange = (e) => {
-      pendingPostcardData = e.target.value.trim();
-    };
-  }
-}
-renderPostcardArea();
-
-const TENOR_API_KEY = '';
-async function searchGifs(q){
-  try{
-    const res = await fetch(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_API_KEY}&limit=9&media_filter=gif`);
-    const data = await res.json();
-    const box = document.getElementById('gifSearchResults');
-    box.innerHTML = (data.results||[]).map(r=>{
-      const url = r.media_formats.tinygif.url;
-      const full = r.media_formats.gif.url;
-      return `<img src="${url}" data-full="${full}">`;
-    }).join('');
-    box.querySelectorAll('img').forEach(img=>{
-      img.onclick = () => { pendingPostcardData = img.dataset.full; toast('GIF selected'); };
-    });
-  }catch(e){ /* silent */ }
-}
-
-document.getElementById('sendGiftBtn').onclick = async () => {
-  const friendId = document.getElementById('giftFriendSelect').value;
-  if(!friendId){ toast('Pick a friend'); return; }
-  try{
-    await api('/api/gift/send', 'POST', {
-      player_id: PLAYER_ID, friend_id: friendId,
-      postcard_type: selectedPostcardType, postcard_data: pendingPostcardData,
-    });
-    toast('Gift sent! 🎁');
-    pendingPostcardData = '';
-    refreshGifts();
-  }catch(e){ toast(e.message); }
-};
-
 let giftsData = null;
 async function refreshGifts(){
   try{ giftsData = await api('/api/gifts/' + PLAYER_ID); }catch(e){ return; }
-  document.getElementById('sendGiftBtn').disabled = !giftsData.can_send_today;
-  document.getElementById('sendGiftStatus').textContent = giftsData.can_send_today ? '' : 'You already sent a gift today — come back tomorrow!';
-  const inbox = document.getElementById('giftInbox');
-  const pending = giftsData.inbox.filter(g=>g.status==='pending');
-  const opened = giftsData.inbox.filter(g=>g.status==='opened').slice(0,5);
-  let html = '';
-  pending.forEach(g=>{
-    html += `<div class="gift-item">
-      <div class="row"><strong>From ${escapeHtml(g.sender_username)}</strong><span class="muted">🎁 unopened</span></div>
-      ${g.postcard_type!=='none' && g.postcard_data ? `<img src="${g.postcard_data}">` : ''}
-      <button class="btn block" style="margin-top:8px;" onclick="openGiftModal('${g.id}','${escapeHtml(g.sender_username)}')" ${giftsData.can_open_today?'':'disabled'}>Open</button>
-    </div>`;
-  });
-  if(!giftsData.can_open_today && pending.length){
-    html += `<p class="muted">You've already opened your daily gift — more tomorrow!</p>`;
-  }
-  opened.forEach(g=>{
-    const r = g.reward;
-    let rewardText = '';
-    if(r){
-      if(r.type==='dust') rewardText = `+${r.amount} dust`;
-      else if(r.type==='tm_charge') rewardText = `TM Charge!`;
-      else if(r.type==='boost') rewardText = `Boost: ${r.boost.name}`;
-      else rewardText = 'Nothing this time';
-    }
-    html += `<div class="gift-item"><div class="row"><span class="muted">From ${escapeHtml(g.sender_username)}</span><span>${rewardText}</span></div></div>`;
-  });
-  inbox.innerHTML = html || '<p class="muted">No gifts yet.</p>';
+  refreshFriends();
 }
 
 let missionsData = null;
