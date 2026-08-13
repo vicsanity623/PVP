@@ -394,6 +394,15 @@ tailscale funnel --https=8443 off                                # stop</pre>
       </div>
     </section>
 
+    <!-- MISSIONS -->
+    <section class="screen" id="screen-missions">
+      <div class="card">
+        <h2>Daily Missions</h2>
+        <p class="muted" id="missionsResetLabel" style="margin-top:-6px;">Resets in --:--</p>
+        <div id="missionsList"></div>
+      </div>
+    </section>
+
     <!-- BATTLE -->
     <section class="screen" id="screen-battle">
       <div class="card" id="battleLobby">
@@ -459,6 +468,7 @@ tailscale funnel --https=8443 off                                # stop</pre>
     <button class="tab" data-screen="friends"><span class="ic">👥</span>Friends</button>
     <button class="tab" data-screen="gifts"><span class="ic">🎁</span>Gifts</button>
     <button class="tab" data-screen="avatar"><span class="ic">🧑</span>Avatar</button>
+    <button class="tab" data-screen="missions"><span class="ic">🎯</span>Missions</button>
     <button class="tab" data-screen="battle"><span class="ic">⚔️</span>Battle</button>
   </nav>
 </div>
@@ -729,6 +739,7 @@ function boot(){
   (async () => { await refreshProfile(); hideSplash(); })();
   refreshFriends();
   refreshGifts();
+  refreshMissions();
   buildMoveList();
   dustTickTimer = setInterval(tickDustCountdown, 1000);
   challengePollTimer = setInterval(pollChallenges, 4000);
@@ -744,6 +755,7 @@ document.querySelectorAll('#tabbar .tab').forEach(btn => {
     if(btn.dataset.screen === 'friends') refreshFriends();
     if(btn.dataset.screen === 'gifts') refreshGifts();
     if(btn.dataset.screen === 'battle') refreshFriends();
+    if(btn.dataset.screen === 'missions') refreshMissions();
   };
 });
 
@@ -1023,6 +1035,40 @@ async function refreshGifts(){
     html += `<div class="gift-item"><div class="row"><span class="muted">From ${escapeHtml(g.sender_username)}</span><span>${rewardText}</span></div></div>`;
   });
   inbox.innerHTML = html || '<p class="muted">No gifts yet.</p>';
+}
+
+let missionsData = null;
+async function refreshMissions(){
+  try{ missionsData = await api('/api/missions/' + PLAYER_ID); }catch(e){ return; }
+  const list = document.getElementById('missionsList');
+  const mins = Math.max(0, Math.round(missionsData.reset_in/60));
+  const h = Math.floor(mins/60), m = mins%60;
+  document.getElementById('missionsResetLabel').textContent = `Resets in ${h}h ${m}m`;
+  list.innerHTML = missionsData.missions.map(mn => {
+    const pct = Math.min(100, (mn.progress/mn.target)*100);
+    const done = mn.progress >= mn.target;
+    const rewardBits = [];
+    if(mn.reward_dust) rewardBits.push(mn.reward_dust + ' ✨');
+    if(mn.reward_xp) rewardBits.push(mn.reward_xp + ' XP');
+    return `<div class="gift-item">
+      <div class="row"><strong>${escapeHtml(mn.name)}</strong><span class="muted">${done?'Complete!':mn.progress+'/'+mn.target}</span></div>
+      <p class="muted" style="margin:4px 0 8px;">${escapeHtml(mn.desc)} · Reward: ${rewardBits.join(', ') || 'None'}</p>
+      <div style="background:var(--bg-deep); border-radius:999px; height:10px; overflow:hidden;">
+        <div style="height:100%; width:${pct}%; background:linear-gradient(90deg,var(--accent),var(--accent-2));"></div>
+      </div>
+      <button class="btn block" style="margin-top:8px;" onclick="claimMission('${mn.id}')" ${done&&!mn.claimed?'':'disabled'}>${mn.claimed?'Claimed ✓':(done?'Claim Reward':'Locked')}</button>
+    </div>`;
+  }).join('');
+}
+async function claimMission(missionId){
+  try{
+    const r = await api('/api/missions/' + PLAYER_ID + '/claim', 'POST', { mission_id: missionId });
+    let msg = 'Mission complete!';
+    if(r.reward_dust) msg += ' +' + r.reward_dust + ' dust';
+    if(r.reward_xp) msg += ' +' + r.reward_xp + ' XP';
+    toast(msg);
+    profile = r.profile; refreshProfile(); refreshMissions();
+  }catch(e){ toast(e.message); }
 }
 
 let openingGiftId = null;
