@@ -108,6 +108,17 @@
   #toast.toast-error{border-color:var(--bad); box-shadow:0 8px 30px rgba(255,93,108,.4);}
   #toast.toast-info{border-color:var(--accent-2); box-shadow:0 8px 30px rgba(138,108,255,.4);}
   #toast.show{opacity:1; top:calc(env(safe-area-inset-top) + 16px); transform:translateX(-50%) scale(1);}
+  #installBanner{
+    position:fixed; bottom:calc(env(safe-area-inset-bottom) + 78px); left:50%; transform:translateX(-50%);
+    width:min(520px, 92vw); background:var(--panel); border:1px solid #4a3a80; border-radius:16px;
+    padding:12px 14px; z-index:150; box-shadow:0 12px 40px rgba(0,0,0,.45); animation:sheetUp .25s ease;
+  }
+  .install-inner{display:flex; align-items:center; gap:10px;}
+  .install-icon{font-size:28px; flex-shrink:0;}
+  .install-text{flex:1; min-width:0;}
+  .install-text strong{display:block; font-size:14px;}
+  .install-text .muted{font-size:12px;}
+  .install-x{background:none; border:none; color:var(--muted); font-size:22px; line-height:1; cursor:pointer; padding:2px 4px; flex-shrink:0;}
   .gift-item{padding:12px; background:var(--panel-2); border-radius:12px; margin-bottom:10px;}
   .gift-item img{max-width:100%; border-radius:8px; margin-top:8px; display:block;}
   .modal-bg{
@@ -256,6 +267,19 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- PWA install banner -->
+<div id="installBanner" style="display:none;">
+  <div class="install-inner">
+    <div class="install-icon">🎁</div>
+    <div class="install-text">
+      <strong>Install GiftQuest</strong>
+      <span class="muted">Add to home screen for one-tap access.</span>
+    </div>
+    <button class="btn" id="installAppBtn" style="flex-shrink:0;">Install</button>
+    <button class="install-x" id="dismissInstallBtn" aria-label="Dismiss">×</button>
+  </div>
+</div>
 
 <!-- FIRST-RUN SETUP -->
 <div id="setupScreen">
@@ -532,6 +556,32 @@ function hideSplash(){
   }
 }
 setTimeout(hideSplash, 2200);
+
+/* ---------------- PWA install banner ---------------- */
+let installEvt = null;
+const installBanner = document.getElementById('installBanner');
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installEvt = e;
+  if(!localStorage.getItem('gq_install_dismissed') && installBanner){
+    installBanner.style.display = 'block';
+  }
+});
+window.addEventListener('appinstalled', () => {
+  installEvt = null;
+  if(installBanner) installBanner.style.display = 'none';
+});
+document.getElementById('installAppBtn').onclick = async () => {
+  if(!installEvt){ if(installBanner) installBanner.style.display = 'none'; return; }
+  installEvt['prompt']();
+  await installEvt.userChoice;
+  installEvt = null;
+  if(installBanner) installBanner.style.display = 'none';
+};
+document.getElementById('dismissInstallBtn').onclick = () => {
+  localStorage.setItem('gq_install_dismissed', '1');
+  if(installBanner) installBanner.style.display = 'none';
+};
 
 /* ---------------- COD Emblem / Gamer Tag Style Avatar ---------------- */
 const defaultAvatarState = {
