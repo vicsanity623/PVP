@@ -451,7 +451,7 @@ tailscale funnel --https=8443 off                                # stop</pre>
               <div class="fighter-card">
                 <div class="f-avatar" id="battleAvatarOpp"></div>
                 <div class="f-name" id="fighterOppName">Opponent</div>
-                <div class="f-level">Lv <span id="fighterOppLevel">1</span></div>
+                <div class="f-level">Lv <span id="fighterOppLevel">1</span><span id="oppTierBadge" class="muted"></span></div>
               </div>
               <div class="bars">
                 <div class="bar-label"><span id="oppRecord" class="muted"></span><span id="hpOppText">--/--</span></div>
@@ -1354,6 +1354,13 @@ function renderBattleState(s){
   document.getElementById('fighterOppName').textContent = s.opponent.username;
   document.getElementById('fighterYouLevel').textContent = s.you.level || (profile ? profile.level : 1);
   document.getElementById('fighterOppLevel').textContent = s.opponent.level || 1;
+  const oppTierBadge = document.getElementById('oppTierBadge');
+  if(oppTierBadge){
+    const oppTier = String(s.opponent.player_id || '').split(':')[4];
+    if(oppTier === 'boss'){ oppTierBadge.textContent = ' 👑 BOSS'; oppTierBadge.style.color = 'var(--bad)'; }
+    else if(oppTier === 'elite'){ oppTierBadge.textContent = ' 💎 Elite'; oppTierBadge.style.color = 'var(--accent-2)'; }
+    else { oppTierBadge.textContent = ''; }
+  }
   const youShape = (profile && profile.avatar) ? profile.avatar : s.you.avatar;
   document.getElementById('battleAvatarYou').innerHTML = renderAvatarSVG(youShape, 120);
   document.getElementById('battleAvatarOpp').innerHTML = renderAvatarSVG(s.opponent.avatar, 120);
