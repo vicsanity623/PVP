@@ -677,6 +677,71 @@ tailscale funnel --https=8443 off                                # stop</pre>
 </script>
 <script src="game.js"></script>
 <script>
+  // Enhance frontend data flow & polling: Request Deduplication, Automatic Retries with Exponential Backoff, and Offline Status Indicator
+  (function() {
+    const originalApi = window.api;
+    if (typeof originalApi !== 'function') return;
+
+    const pendingRequests = new Map();
+    const getCache = new Map();
+    const CACHE_TTL = 1000; // 1 second cache for GET requests
+
+    window.api = async function(path, method = 'GET', body = null) {
+      const key = `${method}:${path}:${body ? JSON.stringify(body) : ''}`;
+
+      if (method === 'GET') {
+        const cached = getCache.get(key);
+        if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+          return cached.data;
+        }
+        if (pendingRequests.has(key)) {
+          return pendingRequests.get(key);
+        }
+      }
+
+      const executeWithRetry = async (retriesLeft = 3, delay = 1000) => {
+        try {
+          return await originalApi(path, method, body);
+        } catch (err) {
+          const isNetworkError = err instanceof TypeError || (err.message && err.message.toLowerCase().includes('fetch'));
+          if (isNetworkError && retriesLeft > 0) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return executeWithRetry(retriesLeft - 1, delay * 2);
+          }
+          throw err;
+        }
+      };
+
+      if (method === 'GET') {
+        const promise = executeWithRetry();
+        pendingRequests.set(key, promise);
+        try {
+          const data = await promise;
+          getCache.set(key, { data, timestamp: Date.now() });
+          return data;
+        } finally {
+          pendingRequests.delete(key);
+        }
+      } else {
+        // For non-GET requests, clear the cache to ensure fresh data on subsequent reads
+        getCache.clear();
+        return executeWithRetry();
+      }
+    };
+
+    window.addEventListener('online', () => {
+      if (typeof window.toast === 'function') {
+        window.toast('Back online! Syncing...', 'success');
+      }
+    });
+    window.addEventListener('offline', () => {
+      if (typeof window.toast === 'function') {
+        window.toast('You are offline. Some features may be unavailable.', 'error');
+      }
+    });
+  })();
+</script>
+<script>
 // Section 22 — Frontend data flow & polling enhancement
 (function() {
   const originalApi = window.api || (typeof api !== 'undefined' ? api : null);
