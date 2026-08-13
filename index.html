@@ -99,12 +99,15 @@
   .friend-info .sub{font-size:12px; color:var(--muted);}
   .flevel{font-size:11px; background:var(--panel-2); padding:3px 8px; border-radius:999px; color:var(--accent);}
   #toast{
-    position:fixed; top:calc(env(safe-area-inset-top) + 8px); left:50%; transform:translateX(-50%);
+    position:fixed; top:calc(env(safe-area-inset-top) + 8px); left:50%; transform:translateX(-50%) scale(.85);
     background:rgba(0,0,0,.88); color:#fff; padding:11px 20px; border-radius:12px; font-size:14px;
-    opacity:0; pointer-events:none; transition:opacity .25s ease, top .25s ease; z-index:999; max-width:88%;
+    opacity:0; pointer-events:none; transition:opacity .25s ease, top .25s ease, transform .2s ease; z-index:999; max-width:88%;
     text-align:center; border:1px solid #4a3a80; box-shadow:0 8px 30px rgba(0,0,0,.4);
   }
-  #toast.show{opacity:1; top:calc(env(safe-area-inset-top) + 16px);}
+  #toast.toast-success{border-color:var(--good); box-shadow:0 8px 30px rgba(75,224,138,.4);}
+  #toast.toast-error{border-color:var(--bad); box-shadow:0 8px 30px rgba(255,93,108,.4);}
+  #toast.toast-info{border-color:var(--accent-2); box-shadow:0 8px 30px rgba(138,108,255,.4);}
+  #toast.show{opacity:1; top:calc(env(safe-area-inset-top) + 16px); transform:translateX(-50%) scale(1);}
   .gift-item{padding:12px; background:var(--panel-2); border-radius:12px; margin-bottom:10px;}
   .gift-item img{max-width:100%; border-radius:8px; margin-top:8px; display:block;}
   .modal-bg{
@@ -677,12 +680,31 @@ function askText(title, message, placeholder, initial, opts = {}){
     opts);
 }
 
-function toast(msg){
+let toastQueue = [];
+let toastShowing = false;
+function toast(msg, type){
+  if(navigator.vibrate){
+    try{ navigator.vibrate(type === 'error' ? 35 : 12); }catch(e){}
+  }
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
+  if(!t) return;
+  toastQueue.push({ msg: String(msg), type: type || 'info' });
+  if(toastShowing) return;
+  showNextToast();
+}
+function showNextToast(){
+  const t = document.getElementById('toast');
+  const item = toastQueue.shift();
+  if(!item){ toastShowing = false; return; }
+  toastShowing = true;
+  t.textContent = item.msg;
+  t.classList.remove('toast-success', 'toast-error', 'toast-info');
+  t.classList.add('toast-' + item.type, 'show');
   clearTimeout(t._timer);
-  t._timer = setTimeout(()=>t.classList.remove('show'), 2200);
+  t._timer = setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(showNextToast, 200);
+  }, 2200);
 }
 
 function escapeAttr(str){
@@ -716,7 +738,7 @@ document.getElementById('setupSubmit').onclick = async () => {
     boot();
     switchTab('avatar');
     toast('Welcome! Customize your trainer, then hit Save Avatar.');
-  }catch(e){ toast('Could not reach server: ' + e.message); }
+  }catch(e){ toast('Could not reach server: ' + e.message, 'error'); }
 };
 
 document.getElementById('setupRestore').onclick = async () => {
@@ -731,7 +753,7 @@ document.getElementById('setupRestore').onclick = async () => {
     localStorage.setItem(STORAGE_KEY_SERVER, SERVER_URL);
     localStorage.setItem(STORAGE_KEY_PLAYER, PLAYER_ID);
     boot();
-  }catch(e){ toast('Could not find that player: ' + e.message); }
+  }catch(e){ toast('Could not find that player: ' + e.message, 'error'); }
 };
 
 function boot(){
@@ -1375,7 +1397,8 @@ async function updateBattleState(){
     }
     else if(!s.winner_id) msg = 'Draw!';
     else msg = 'Defeat — good fight!';
-    setTimeout(()=>toast(msg), 400);
+    const toastType = s.winner_id === s.you.player_id ? 'success' : (!s.winner_id ? 'info' : 'error');
+    setTimeout(()=>toast(msg, toastType), 400);
   }
 }
 
