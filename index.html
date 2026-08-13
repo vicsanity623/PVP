@@ -397,12 +397,12 @@ tailscale funnel --https=8443 off                                # stop</pre>
     <!-- BATTLE -->
     <section class="screen" id="screen-battle">
       <div class="card" id="battleLobby">
-        <h2>Battle</h2>
+        <h2>Battle Arena</h2>
         <div id="incomingChallenge" style="display:none; background:var(--panel-2); padding:12px; border-radius:12px; margin-bottom:12px;"></div>
-        <p class="muted">Challenge a friend (unlocks at friendship level 10) or enter the Rank League to fight an equally-matched rival any time.</p>
+        <p class="muted">Challenge a friend or battle level-scaled NPC monsters for turn-based combat anytime!</p>
         <select id="battleFriendSelect" style="margin-bottom:10px;"><option>Loading friends...</option></select>
         <button class="btn block" id="challengeBtn" style="margin-bottom:10px;">Challenge Friend</button>
-        <button class="btn secondary block" id="rankLeagueBtn">Enter Rank League</button>
+        <button class="btn secondary block" id="rankLeagueBtn">⚔️ Battle NPC Enemy (Level Scaled)</button>
       </div>
       <div class="card" id="battleArenaCard" style="display:none;">
         <div id="battleArena">
@@ -1301,12 +1301,6 @@ async function respondChallenge(challengeId, accept){
   }catch(e){ toast(e.message); }
 }
 
-function rivalAvatar(){
-  const r = Object.assign({}, avatarState);
-  if(r.bg === 'none') r.bg = '#4a2f1d';
-  return r;
-}
-
 function enterBattle(battleId){
   currentBattleId = battleId;
   document.getElementById('battleLobby').style.display = 'none';
@@ -1348,7 +1342,7 @@ function renderBattleState(s){
   document.getElementById('fighterOppLevel').textContent = s.opponent.level || 1;
   const youShape = (profile && profile.avatar) ? profile.avatar : s.you.avatar;
   document.getElementById('battleAvatarYou').innerHTML = renderAvatarSVG(youShape, 120);
-  document.getElementById('battleAvatarOpp').innerHTML = renderAvatarSVG(s.opponent.avatar || rivalAvatar(), 120);
+  document.getElementById('battleAvatarOpp').innerHTML = renderAvatarSVG(s.opponent.avatar, 120);
 
   const hpYouPct = Math.max(0,(s.you.hp/s.you.hp_max)*100);
   const hpOppPct = Math.max(0,(s.opponent.hp/s.opponent.hp_max)*100);
