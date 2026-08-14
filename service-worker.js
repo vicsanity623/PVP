@@ -1,6 +1,6 @@
 // GiftQuest service worker — caches the static app shell only.
 // All game data comes live from your Tailscale backend, never cached here.
-const CACHE_NAME = 'giftquest-shell-v3.12';
+const CACHE_NAME = 'giftquest-shell-v0.13';
 const SHELL_FILES = ['./index.html', './game.js', './manifest.json'];
 
 self.addEventListener('install', (event) => {
