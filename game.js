@@ -477,10 +477,10 @@ async function refreshFriends(){
   const opensLeft = friendsCache.length ? friendsCache[0].opens_left : 0;
   const openLimit = friendsCache.length ? friendsCache[0].open_limit : GIFT_OPEN_DAILY_LIMIT;
   document.getElementById('giftOpenCount').textContent = `🎁 Gifts you can open today: ${opensLeft}/${openLimit}`;
-  const gts = friendsCache.length ? friendsCache[0].gifts_to_send : 0;
+  const gts = profile ? profile.gifts_to_send : (friendsCache.length ? friendsCache[0].gifts_to_send : 0);
   const sentTotal = friendsCache.length ? (friendsCache[0].sends_total_today || 0) : 0;
   const gtsEl = document.getElementById('giftsToSendCount');
-  if(gtsEl) gtsEl.textContent = `📨 Gifts to send: ${gts} | Daily sent: ${sentTotal}/30`;
+  if(gtsEl) gtsEl.textContent = `🎁 Gift Inventory: ${gts} available | Daily sent today: ${sentTotal}/30`;
   if(!friendsCache.length){
     list.innerHTML = '<p class="muted">No friends yet — add one above!</p>';
   } else {
@@ -547,7 +547,8 @@ async function tapSendGift(friendId){
       postcard_data: ''
     });
     if(res && res.ok){
-      toast(`Gift sent to ${escapeHtml(f.username)}!`);
+      if(res.profile) profile = res.profile;
+      toast(`Gift sent to ${escapeHtml(f.username)}! (${res.gifts_to_send} gifts left in inventory)`);
       refreshFriends();
       refreshProfile();
     } else if(res && res.error){
