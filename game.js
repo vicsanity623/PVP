@@ -260,6 +260,7 @@ document.getElementById('setupSubmit').onclick = async () => {
     boot();
     switchTab('avatar');
     toast('Welcome! Customize your trainer, then hit Save Avatar.');
+    setTimeout(startTour, 600);
   }catch(e){ toast('Could not reach server: ' + e.message, 'error'); }
 };
 
@@ -290,6 +291,56 @@ function boot(){
   dustTickTimer = setInterval(tickDustCountdown, 1000);
   challengePollTimer = setInterval(pollChallenges, 4000);
   setInterval(refreshProfile, 20000);
+}
+
+/* ---------------- Onboarding tour (Section 8) ---------------- */
+const TOUR_STEPS = [
+  { tab: 'home', title: 'Home base', text: 'Welcome, Trainer! This is home — collect ✨ Dust every hour, spend it on XP, and share your Friend Code so friends can find you.' },
+  { tab: 'friends', title: 'Friends', text: 'Add friends with their 6-char Friend Code, swap a gift each day, and grow friendship to Lv 10 to unlock live PvP.' },
+  { tab: 'avatar', title: 'Avatar studio', text: 'Make your emblem yours — head, body, hair and accessories. Hit Save Avatar when you are done.' },
+  { tab: 'missions', title: 'Daily missions', text: 'Five missions refresh every UTC day. Natural play earns the rewards automatically.' },
+  { tab: 'battle', title: 'Battle', text: 'Fight friends or NPC enemies for rewards. Good luck!' }
+];
+
+function startTour(){
+  if(localStorage.getItem('gq_tour_done')) return;
+  let idx = 0;
+  const overlay = document.getElementById('tourOverlay');
+  if(!overlay) return;
+  const titleEl = document.getElementById('tourTitle');
+  const textEl = document.getElementById('tourText');
+  const nextBtn = document.getElementById('tourNext');
+  const skipBtn = document.getElementById('tourSkip');
+  function endTour(){
+    overlay.classList.remove('show');
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('tour-glow'));
+    localStorage.setItem('gq_tour_done', '1');
+    switchTab('avatar');
+    toast('Welcome to GiftQuest! 🎉');
+  }
+  function render(){
+    const step = TOUR_STEPS[idx];
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('tour-glow'));
+    const tabBtn = document.querySelector('.tab[data-screen="' + step.tab + '"]');
+    if(tabBtn) tabBtn.classList.add('tour-glow');
+    switchTab(step.tab);
+    titleEl.textContent = step.title;
+    textEl.textContent = step.text;
+    nextBtn.textContent = (idx < TOUR_STEPS.length - 1) ? 'Next ➜' : 'Done ✓';
+  }
+  nextBtn.onclick = () => {
+    idx++;
+    if(idx >= TOUR_STEPS.length){ endTour(); return; }
+    render();
+  };
+  skipBtn.onclick = endTour;
+  overlay.classList.add('show');
+  render();
+}
+
+function replayTour(){
+  localStorage.removeItem('gq_tour_done');
+  startTour();
 }
 
 if(PLAYER_ID){ boot(); } else { hideSplash(); }

@@ -272,6 +272,20 @@
   .dlg-body label{font-size:12px; color:var(--muted); display:block; margin:12px 0 6px; text-transform:uppercase; letter-spacing:.6px;}
   .dlg-btns{display:flex; gap:10px; margin-top:20px;}
   .dlg-btns .btn{flex:1;}
+  #tourOverlay{
+    position:fixed; inset:0; z-index:300; background:rgba(10,6,20,.78);
+    display:none; align-items:center; justify-content:center; padding:24px;
+    backdrop-filter:blur(2px);
+  }
+  #tourOverlay.show{display:flex;}
+  .tour-box{
+    background:var(--panel); border:1px solid var(--accent); border-radius:18px;
+    padding:22px; max-width:340px; width:100%; text-align:center;
+    box-shadow:0 12px 40px rgba(0,0,0,.5); animation:sheetUp .25s ease;
+  }
+  .tour-box h3{color:var(--accent); margin:0 0 8px; font-size:18px;}
+  .tab.tour-glow{color:var(--accent); animation:blink .8s infinite alternate;}
+  .tab.tour-glow .ic{filter:none; opacity:1;}
   @media(min-width:700px){
     header{padding:18px 24px 12px;}
     main{padding:16px 24px 110px;}
@@ -383,6 +397,7 @@ tailscale funnel --https=8443 off                                # stop</pre>
           <p class="muted" style="flex:1;">Share this code so friends can add you.</p>
           <button class="btn secondary" id="copyCodeBtn">Copy</button>
         </div>
+        <p class="muted" style="font-size:11.5px; margin-top:8px; text-align:center;"><a href="#" onclick="replayTour(); return false;" style="color:var(--accent-2);">🗺️ Replay onboarding tour</a></p>
       </div>
       <div class="card" id="activeBoostsCard" style="display:none;">
         <h2>Active Boosts</h2>
@@ -537,6 +552,18 @@ tailscale funnel --https=8443 off                                # stop</pre>
   <div class="modal">
     <button class="close-x" id="closeFriendProfileModal">×</button>
     <div id="friendProfileContent"></div>
+  </div>
+</div>
+
+<!-- Onboarding tour overlay -->
+<div id="tourOverlay">
+  <div class="tour-box">
+    <h3 id="tourTitle">Home base</h3>
+    <p class="muted" id="tourText" style="margin:0 0 16px;"></p>
+    <div class="dlg-btns">
+      <button class="btn" id="tourNext" style="flex:1;">Next ➜</button>
+      <button class="btn secondary" id="tourSkip" style="flex:1;">Skip</button>
+    </div>
   </div>
 </div>
 
