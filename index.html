@@ -852,7 +852,11 @@ tailscale funnel --https=8443 off                                # stop</pre>
 
   // Wrap the global api helper
   window.api = async function(path, method = 'GET', body = null) {
-    const methodUpper = method.toUpperCase();
+    if (typeof method === 'object' && method !== null) {
+      body = method.body ? (typeof method.body === 'string' ? JSON.parse(method.body) : method.body) : body;
+      method = method.method || 'GET';
+    }
+    const methodUpper = String(method || 'GET').toUpperCase();
     const isPoll = path.includes('/pending/') || path.includes('/state') || path.includes('/profile/') || path.includes('/missions/');
 
     // Request Deduplication for GET requests
