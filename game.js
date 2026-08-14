@@ -522,17 +522,23 @@ async function tapSendGift(friendId){
     toast('No gifts to send — level up to earn 2-5 gifts!');
     return;
   }
-  const res = await api('/api/gift/send', {
-    method: 'POST',
-    body: JSON.stringify({ player_id: PLAYER_ID, friend_id: friendId, postcard_type: 'none', postcard_data: '' }),
-  });
-  if(res && res.ok){
-    toast(`Gift sent to ${escapeHtml(f.username)}!`);
-    refreshFriends();
-    refreshProfile();
-  } else if(res && res.error){
-    toast(res.error);
-    refreshFriends();
+  try {
+    const res = await api('/api/gift/send', 'POST', {
+      player_id: PLAYER_ID,
+      friend_id: friendId,
+      postcard_type: 'none',
+      postcard_data: ''
+    });
+    if(res && res.ok){
+      toast(`Gift sent to ${escapeHtml(f.username)}!`);
+      refreshFriends();
+      refreshProfile();
+    } else if(res && res.error){
+      toast(res.error, 'error');
+      refreshFriends();
+    }
+  } catch(e) {
+    toast(e.message || 'Failed to send gift', 'error');
   }
 }
 
