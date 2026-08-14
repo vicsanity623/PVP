@@ -5,6 +5,7 @@ const DEFAULT_SERVER_URL = 'https://vics-imac-1.tail37b4f2.ts.net:8443';
 let SERVER_URL = localStorage.getItem(STORAGE_KEY_SERVER) || DEFAULT_SERVER_URL;
 let PLAYER_ID = localStorage.getItem(STORAGE_KEY_PLAYER) || '';
 let profile = null;
+let lastLevel = null;
 let friendsCache = [];
 let currentBattleId = null;
 let battlePollTimer = null;
@@ -343,6 +344,20 @@ function replayTour(){
   startTour();
 }
 
+/* ---------------- Level-up fanfare (Section 9) ---------------- */
+function showLevelUpFanfare(level, gained){
+  const overlay = document.getElementById('levelUpOverlay');
+  if(!overlay) return;
+  document.getElementById('levelUpTitle').textContent = gained > 1 ? ('LEVEL UP x' + gained + '!') : 'LEVEL UP!';
+  document.getElementById('levelUpLevel').textContent = level;
+  document.getElementById('levelUpSub').textContent = gained > 1 ? ('You gained ' + gained + ' Trainer levels in one go!') : 'New Trainer level reached!';
+  overlay.classList.add('show');
+  if(navigator.vibrate){ try{ navigator.vibrate([60, 40, 80]); }catch(e){} }
+}
+document.getElementById('levelUpOverlay').onclick = () => {
+  document.getElementById('levelUpOverlay').classList.remove('show');
+};
+
 if(PLAYER_ID){ boot(); } else { hideSplash(); }
 
 /* ---------------- Tabs ---------------- */
@@ -360,6 +375,10 @@ async function refreshProfile(){
   try{
     profile = await api('/api/profile/' + PLAYER_ID);
   }catch(e){ return; }
+  if(lastLevel !== null && profile.level > lastLevel){
+    showLevelUpFanfare(profile.level, profile.level - lastLevel);
+  }
+  lastLevel = profile.level;
   document.getElementById('headerDust').textContent = profile.dust;
   document.getElementById('homeUsername').textContent = profile.username;
   document.getElementById('homeLevel').textContent = profile.level;
