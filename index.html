@@ -104,6 +104,13 @@
   }
   .friend-row .gift-btn:active{transform:scale(.9);}
   .friend-row .gift-btn.greyed{opacity:.32; border-color:var(--muted); filter:grayscale(1); cursor:default;}
+  .friend-row .send-btn{
+    font-size:13px; background:var(--panel-2); border:1px solid var(--accent); border-radius:12px;
+    padding:7px 10px; cursor:pointer; margin-left:8px; flex-shrink:0; font-weight:600;
+    transition:opacity .2s, transform .15s; color:var(--accent); white-space:nowrap;
+  }
+  .friend-row .send-btn:active{transform:scale(.9);}
+  .friend-row .send-btn.greyed{opacity:.32; border-color:var(--muted); filter:grayscale(1); cursor:default;}
   .gift-open-row{display:flex; align-items:center; gap:10px; padding:10px; background:var(--panel-2); border-radius:12px; margin-top:12px;}
   .gift-open-row .gift-big{font-size:34px; flex-shrink:0;}
   #toast{
@@ -435,6 +442,7 @@ tailscale funnel --https=8443 off                                # stop</pre>
       <div class="card">
         <h2>Your Friends</h2>
         <p class="muted" id="giftOpenCount" style="margin:-6px 0 8px;"></p>
+        <p class="muted" id="giftsToSendCount" style="margin:-4px 0 8px;"></p>
         <div id="friendsList"><p class="muted">No friends yet — add one above!</p></div>
       </div>
     </section>
