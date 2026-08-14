@@ -478,12 +478,21 @@ async function refreshFriends(){
   const openLimit = friendsCache.length ? friendsCache[0].open_limit : GIFT_OPEN_DAILY_LIMIT;
   document.getElementById('giftOpenCount').textContent = `🎁 Gifts you can open today: ${opensLeft}/${openLimit}`;
   const gts = friendsCache.length ? friendsCache[0].gifts_to_send : 0;
+  const sentTotal = friendsCache.length ? (friendsCache[0].sends_total_today || 0) : 0;
   const gtsEl = document.getElementById('giftsToSendCount');
-  if(gtsEl) gtsEl.textContent = `📨 Gifts you can send: ${gts} (earn 2-5 per level up)`;
+  if(gtsEl) gtsEl.textContent = `📨 Gifts to send: ${gts} | Daily sent: ${sentTotal}/30`;
   if(!friendsCache.length){
     list.innerHTML = '<p class="muted">No friends yet — add one above!</p>';
   } else {
-    list.innerHTML = friendsCache.map(f => `
+    list.innerHTML = friendsCache.map(f => {
+      const friendSends = f.sends_to_friend_today || 0;
+      const canSend = f.can_send_gift !== undefined ? f.can_send_gift : (f.gifts_to_send > 0 && friendSends < 2 && sentTotal < 30);
+      let btnTitle = `Send gift to ${escapeHtml(f.username)} (${friendSends}/2 sent today)`;
+      if (friendSends >= 2) btnTitle = `Max daily gifts (2/2) already sent to ${escapeHtml(f.username)}`;
+      else if (sentTotal >= 30) btnTitle = 'Daily total limit (30) reached';
+      else if (f.gifts_to_send <= 0) btnTitle = 'No gifts available to send';
+
+      return `
       <div class="friend-row" onclick="showFriendProfile('${f.id}')">
         <div class="avatar-thumb">${renderAvatarSVG(f.avatar, 46)}</div>
         <div class="friend-info">
@@ -491,10 +500,10 @@ async function refreshFriends(){
           <div class="sub">Lv ${f.level} · ${f.pvp_wins}-${f.pvp_losses} PvP</div>
         </div>
         <div class="flevel">Friend Lv ${f.friendship_level}</div>
-        <button class="send-btn ${f.gifts_to_send > 0 ? '' : 'greyed'}" onclick="event.stopPropagation(); tapSendGift('${f.id}')" title="Send a gift to ${escapeHtml(f.username)}">📨 Send</button>
+        <button class="send-btn ${canSend ? '' : 'greyed'}" onclick="event.stopPropagation(); tapSendGift('${f.id}')" title="${btnTitle}">📨 Send (${friendSends}/2)</button>
         <button class="gift-btn ${f.gift_from_friend && f.opens_left > 0 ? '' : 'greyed'}" onclick="event.stopPropagation(); tapFriendGift('${f.id}')" title="Open gift from ${escapeHtml(f.username)}">🎁</button>
       </div>
-    `).join('');
+    `}).join('');
   }
 
   const battleSel = document.getElementById('battleFriendSelect');
@@ -519,7 +528,15 @@ async function tapSendGift(friendId){
   const f = friendsCache.find(x=>x.id===friendId);
   if(!f){ return; }
   if(f.gifts_to_send <= 0){
-    toast('No gifts to send — level up to earn 2-5 gifts!');
+    toast('No gifts in inventory — level up to earn 2-5 gifts!', 'error');
+    return;
+  }
+  if((f.sends_total_today || 0) >= 30){
+    toast('Daily limit reached (max 30 gifts sent per day)!', 'error');
+    return;
+  }
+  if((f.sends_to_friend_today || 0) >= 2){
+    toast(`Already sent max gifts (2/2) to ${escapeHtml(f.username)} today!`, 'error');
     return;
   }
   try {
