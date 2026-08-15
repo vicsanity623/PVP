@@ -607,6 +607,8 @@ async function refreshFriends(){
   try{
     friendsCache = await api('/api/friends/' + PLAYER_ID);
   }catch(e){ return; }
+  const waitingGifts = friendsCache.filter(f => f.gift_from_friend && f.opens_left > 0).length;
+  updateFriendsTabBadge(waitingGifts);
   const list = document.getElementById('friendsList');
   const opensLeft = friendsCache.length ? friendsCache[0].opens_left : 0;
   const openLimit = friendsCache.length ? friendsCache[0].open_limit : GIFT_OPEN_DAILY_LIMIT;
@@ -635,7 +637,7 @@ async function refreshFriends(){
         </div>
         <div class="flevel">Friend Lv ${f.friendship_level}</div>
         <button class="send-btn ${canSend ? '' : 'greyed'}" onclick="event.stopPropagation(); tapSendGift('${f.id}')" title="${btnTitle}">📨 Send (${friendSends}/2)</button>
-        <button class="gift-btn ${f.gift_from_friend && f.opens_left > 0 ? '' : 'greyed'}" onclick="event.stopPropagation(); tapFriendGift('${f.id}')" title="Open gift from ${escapeHtml(f.username)}">🎁</button>
+        <button class="gift-btn ${f.gift_from_friend && f.opens_left > 0 ? 'sparkle' : 'greyed'}" onclick="event.stopPropagation(); openGiftPulse(this); tapFriendGift('${f.id}')" title="Open gift from ${escapeHtml(f.username)}">🎁</button>
       </div>
     `}).join('');
   }
@@ -648,6 +650,72 @@ async function refreshFriends(){
     }).join('');
   } else {
     battleSel.innerHTML = '<option value="">Add a friend first</option>';
+  }
+}
+
+function ensureGiftStyles(){
+  if (document.getElementById('giftFxStyle')) return;
+  const css = [
+    '.gift-btn { position: relative; }',
+    '.gift-btn.sparkle::after {',
+    "  content: '✦'; position: absolute; top: -6px; right: -4px;",
+    '  font-size: 13px; color: #ffd93b; pointer-events: none;',
+    '  text-shadow: 0 0 6px #ffd93b, 0 0 12px #ffb300;',
+    '  animation: giftSparkle 1.1s ease-in-out infinite;',
+    '}',
+    '@keyframes giftSparkle {',
+    '  0%, 100% { transform: scale(0.7) rotate(0deg); opacity: 0.4; }',
+    '  50% { transform: scale(1.4) rotate(20deg); opacity: 1; }',
+    '}',
+    '.gift-btn.opening { animation: giftOpenPop 0.55s ease; }',
+    '@keyframes giftOpenPop {',
+    '  0% { transform: scale(1); }',
+    '  35% { transform: scale(1.65) rotate(-8deg); }',
+    '  70% { transform: scale(0.85) rotate(6deg); }',
+    '  100% { transform: scale(1); }',
+    '}',
+    '#friendsTabBadge, .tab-badge {',
+    '  background: #e63b3b; color: #fff; border-radius: 10px;',
+    '  font-size: 11px; font-weight: 700; line-height: 1;',
+    '  padding: 3px 6px; min-width: 18px; text-align: center;',
+    '  box-shadow: 0 0 8px rgba(230,59,59,.85);',
+    '  display: none; position: relative; top: -4px; margin-left: 4px;',
+    '}',
+  ].join('\n');
+  const st = document.createElement('style');
+  st.id = 'giftFxStyle';
+  st.textContent = css;
+  document.head.appendChild(st);
+}
+
+function openGiftPulse(btn){
+  ensureGiftStyles();
+  if (btn && !btn.classList.contains('greyed')) {
+    btn.classList.add('opening');
+    setTimeout(() => btn.classList.remove('opening'), 600);
+  }
+}
+
+function updateFriendsTabBadge(count){
+  ensureGiftStyles();
+  let badge = document.getElementById('friendsTabBadge');
+  if (!badge) {
+    document.querySelectorAll('.badge').forEach(b => {
+      const p = b.parentElement;
+      if (p && /friend/i.test(p.id || p.className || '')) badge = badge || b;
+    });
+  }
+  if (!badge) {
+    const tab = document.querySelector('[data-tab="friends"], #friendsTab, #tab-friends, .friends-tab');
+    if (tab) {
+      badge = document.createElement('span');
+      badge.className = 'tab-badge';
+      tab.appendChild(badge);
+    }
+  }
+  if (badge) {
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.style.display = count > 0 ? 'inline-block' : 'none';
   }
 }
 
