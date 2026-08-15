@@ -62,6 +62,8 @@ const defaultAvatarState = {
   head: { shape: 'circle', color: '#f3c19a', x: 0, y: -5, scale: 1, rot: 0 },
   body: { shape: 'torso', color: '#ff6b6b', x: 0, y: 25, scale: 1, rot: 0 },
   hair: { shape: 'spiky', color: '#1d1d1d', x: 0, y: -22, scale: 1, rot: 0 },
+  eyes: { shape: 'round', color: '#1d1d1d', x: 0, y: -4, scale: 1, rot: 0 },
+  mouth: { shape: 'smile', color: '#1d1d1d', x: 0, y: 10, scale: 1, rot: 0 },
   acc:  { shape: 'none', color: '#1a1a1a', x: 0, y: -5, scale: 1, rot: 0 }
 };
 
@@ -102,6 +104,21 @@ const AV_SHAPES = {
     curly: '<g><circle cx="-14" cy="-12" r="8"/><circle cx="0" cy="-20" r="9"/><circle cx="14" cy="-12" r="8"/><circle cx="-8" cy="-4" r="7"/><circle cx="8" cy="-4" r="7"/></g>',
     messy: '<path d="M-22,0 C-26,-14 -18,-22 -10,-20 C-12,-30 2,-32 10,-24 C18,-28 26,-20 22,-6 C28,-2 24,6 18,6 L-18,6 C-24,6 -26,-2 -22,0 Z"/>'
   },
+  eyes: {
+    round: '<circle cx="-8" cy="0" r="3.5"/><circle cx="8" cy="0" r="3.5"/>',
+    oval: '<ellipse cx="-8" cy="0" rx="4" ry="5.5"/><ellipse cx="8" cy="0" rx="4" ry="5.5"/>',
+    happy: '<path d="M-11,-1 Q-8,-7 -5,-1 Z"/><path d="M5,-1 Q8,-7 11,-1 Z"/>',
+    angry: '<path d="M-12,-3 L-6,-7 L-3,-3 Z"/><path d="M12,-3 L6,-7 L3,-3 Z"/>',
+    closed: '<path d="M-12,-1 Q-8,-5 -4,-1" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M4,-1 Q8,-5 12,-1" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>'
+  },
+  mouth: {
+    smile: '<path d="M-8,4 Q0,14 8,4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
+    frown: '<path d="M-8,12 Q0,2 8,12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
+    flat: '<path d="M-8,8 L8,8" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>',
+    grin: '<path d="M-9,6 Q0,16 9,6 Q0,9 -9,6 Z"/>',
+    open: '<ellipse cx="0" cy="8" rx="5" ry="6"/>',
+    smirk: '<path d="M-9,5 Q-3,13 6,4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>'
+  },
   acc: {
     none: '',
     glasses: '<g fill="none" stroke="currentColor" stroke-width="3"><circle cx="-10" cy="0" r="7"/><circle cx="10" cy="0" r="7"/><line x1="-3" y1="0" x2="3" y2="0"/></g>',
@@ -125,6 +142,8 @@ function normalizeAvatarState(raw){
     head: Object.assign({}, base.head, raw.head || { color: raw.skin }),
     body: Object.assign({}, base.body, raw.body || { color: raw.outfitColor }),
     hair: Object.assign({}, base.hair, raw.hair || { shape: raw.hairStyle === 'bald' ? 'none' : 'spiky', color: raw.hairColor }),
+    eyes: Object.assign({}, base.eyes, raw.eyes || {}),
+    mouth: Object.assign({}, base.mouth, raw.mouth || {}),
     acc:  Object.assign({}, base.acc, raw.acc || {})
   };
 }
@@ -134,6 +153,8 @@ function renderAvatarSVG(rawState, size){
   const layers = [
     { key: 'body', defaultY: 25 },
     { key: 'head', defaultY: -5 },
+    { key: 'eyes', defaultY: -4 },
+    { key: 'mouth', defaultY: 10 },
     { key: 'hair', defaultY: -22 },
     { key: 'acc',  defaultY: -5 }
   ];
@@ -283,7 +304,16 @@ document.getElementById('setupRestore').onclick = async () => {
 function boot(){
   document.getElementById('setupScreen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  (async () => { await refreshProfile(); hideSplash(); })();
+  // Prevent double-tap / double-click zoom on the main HUD & home screen.
+  document.documentElement.style.touchAction = 'manipulation';
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+  (async () => {
+    await refreshProfile();
+    hideSplash();
+    // Avatar feature on home: render the player's avatar into the HUD.
+    const homeAvatar = document.getElementById('homeAvatar');
+    if (homeAvatar) homeAvatar.innerHTML = renderAvatarSVG(avatarState, 96);
+  })();
   refreshFriends();
   refreshGifts();
   refreshMissions();
