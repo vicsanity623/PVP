@@ -40,6 +40,110 @@ window.addEventListener('beforeinstallprompt', (e) => {
     installBanner.style.display = 'block';
   }
 });
+
+// ===== Section 6: Visual style & theme system =====
+const EASINGS = {
+  linear: t => t,
+  easeInQuad: t => t * t,
+  easeOutQuad: t => t * (2 - t),
+  easeInOutQuad: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+  easeInOutCubic: t => t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1,
+  easeOutBack: t => { const c = 1.70158, u = t - 1; return u * u * ((c + 1) * u + c) + 1; }
+};
+
+const THEMES = {
+  light: { label: 'Light', dark: false },
+  dark: { label: 'Dark', dark: true },
+  system: { label: 'System', dark: null }
+};
+
+const THEME_ICONS = {
+  system: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+  light: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  dark: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>'
+};
+const THEME_ORDER = ['system', 'light', 'dark'];
+
+const gqThemeState = {
+  pref: localStorage.getItem('gq_theme') || 'system',
+  mediaDark: false,
+  reduced: false
+};
+
+function gqApplyTheme(){
+  const root = document.documentElement;
+  const dark = gqThemeState.pref === 'dark' || (gqThemeState.pref === 'system' && gqThemeState.mediaDark);
+  root.setAttribute('data-theme', dark ? 'dark' : 'light');
+  root.classList.toggle('gq-reduced-motion', gqThemeState.reduced);
+  localStorage.setItem('gq_theme', gqThemeState.pref);
+  const btn = document.getElementById('gqThemeToggle');
+  if(btn){
+    btn.innerHTML = THEME_ICONS[gqThemeState.pref];
+    btn.setAttribute('aria-label', 'Theme: ' + THEMES[gqThemeState.pref].label + ' (click to cycle)');
+  }
+}
+
+function gqThemeCSS(){
+  if(document.getElementById('gqThemeStyle')) return;
+  const style = document.createElement('style');
+  style.id = 'gqThemeStyle';
+  style.textContent = [
+    ':root{ --gq-ease: cubic-bezier(.25,.8,.35,1); --gq-dur: 240ms; }',
+    ':root[data-theme="dark"]{ --gq-bg:#0f1115; --gq-panel:#171a21; --gq-text:#e7e9ee; --gq-muted:#9aa3b2; --gq-accent:#7c9cff; --gq-border:#2a2f3a; color-scheme:dark; }',
+    ':root[data-theme="light"]{ --gq-bg:#f5f6fa; --gq-panel:#ffffff; --gq-text:#20242c; --gq-muted:#6b7280; --gq-accent:#4f6ef7; --gq-border:#e2e5ec; color-scheme:light; }',
+    'body{ background:var(--gq-bg); color:var(--gq-text); transition:background var(--gq-dur) var(--gq-ease), color var(--gq-dur) var(--gq-ease); }',
+    '#gqThemeToggle{ position:fixed; right:14px; bottom:70px; z-index:9999; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:50%; border:1px solid var(--gq-border); background:var(--gq-panel); color:var(--gq-text); box-shadow:0 2px 10px rgba(0,0,0,.22); transition:transform var(--gq-dur) var(--gq-ease), background var(--gq-dur) var(--gq-ease), color var(--gq-dur) var(--gq-ease); }',
+    '#gqThemeToggle:hover{ transform:scale(1.1) rotate(12deg); }',
+    '.gq-reduced-motion *, .gq-reduced-motion *::before, .gq-reduced-motion *::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }'
+  ].join('\n');
+  document.head.appendChild(style);
+}
+
+function gqCycleTheme(){
+  const idx = THEME_ORDER.indexOf(gqThemeState.pref);
+  gqThemeState.pref = THEME_ORDER[(idx + 1) % THEME_ORDER.length];
+  gqApplyTheme();
+}
+
+function gqInitTheme(){
+  gqThemeCSS();
+  const colorMedia = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+  const motionMedia = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  const refresh = () => {
+    gqThemeState.mediaDark = colorMedia ? colorMedia.matches : false;
+    gqThemeState.reduced = motionMedia ? motionMedia.matches : false;
+    gqApplyTheme();
+  };
+  if(colorMedia && colorMedia.addEventListener) colorMedia.addEventListener('change', refresh);
+  if(motionMedia && motionMedia.addEventListener) motionMedia.addEventListener('change', refresh);
+  const ready = () => {
+    if(!document.getElementById('gqThemeToggle')){
+      const btn = document.createElement('button');
+      btn.id = 'gqThemeToggle';
+      btn.type = 'button';
+      btn.addEventListener('click', gqCycleTheme);
+      document.body.appendChild(btn);
+    }
+    refresh();
+  };
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', ready);
+  } else {
+    ready();
+  }
+}
+
+// Public helpers: easing lookup, icon set, reduced-motion flag, theme setter
+const GQ_UI = {
+  easing: (name, t) => (EASINGS[name] || EASINGS.linear)(t),
+  icon: name => THEME_ICONS[name] || '',
+  prefersReducedMotion: () => gqThemeState.reduced,
+  setTheme: pref => { if(THEMES[pref]){ gqThemeState.pref = pref; gqApplyTheme(); } },
+  getTheme: () => gqThemeState.pref
+};
+window.GQ_UI = GQ_UI;
+
+gqInitTheme();
 window.addEventListener('appinstalled', () => {
   installEvt = null;
   if(installBanner) installBanner.style.display = 'none';
